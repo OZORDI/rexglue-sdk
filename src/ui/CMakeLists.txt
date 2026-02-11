@@ -1,0 +1,170 @@
+# rexui
+
+# Core UI sources
+set(REXUI_CORE_SOURCES
+    graphics_upload_buffer_pool.cpp
+    graphics_util.cpp
+    imgui_dialog.cpp
+    imgui_drawer.cpp
+    immediate_drawer.cpp
+    menu_item.cpp
+    presenter.cpp
+    renderdoc_api.cpp
+    window.cpp
+    windowed_app.cpp
+    windowed_app_context.cpp
+)
+
+# Vulkan UI backend
+set(REXUI_VULKAN_SOURCES
+    vulkan/linked_type_descriptor_set_allocator.cpp
+    vulkan/single_layout_descriptor_set_pool.cpp
+    vulkan/spirv_tools_context.cpp
+    vulkan/ui_samplers.cpp
+    vulkan/vulkan_device.cpp
+    vulkan/vulkan_immediate_drawer.cpp
+    vulkan/vulkan_instance.cpp
+    vulkan/vulkan_mem_alloc.cpp
+    vulkan/vulkan_presenter.cpp
+    vulkan/vulkan_provider.cpp
+    vulkan/vulkan_submission_tracker.cpp
+    vulkan/vulkan_upload_buffer_pool.cpp
+    vulkan/vulkan_util.cpp
+)
+
+# Metal UI backend (macOS only)
+if(APPLE)
+    set(REXUI_METAL_SOURCES
+        metal/metal_provider.mm
+        metal/metal_presenter.mm
+        metal/metal_immediate_drawer.mm
+    )
+endif()
+
+# D3D12 UI backend (Windows only)
+if(WIN32)
+    set(REXUI_D3D12_SOURCES
+        d3d12/d3d12_cpu_descriptor_pool.cpp
+        d3d12/d3d12_descriptor_heap_pool.cpp
+        d3d12/d3d12_immediate_drawer.cpp
+        d3d12/d3d12_presenter.cpp
+        d3d12/d3d12_provider.cpp
+        d3d12/d3d12_submission_tracker.cpp
+        d3d12/d3d12_upload_buffer_pool.cpp
+        d3d12/d3d12_util.cpp
+    )
+endif()
+
+# Platform-specific sources
+if(WIN32)
+    set(REXUI_PLATFORM_SOURCES
+        surface_win.cpp
+        window_win.cpp
+        windowed_app_context_win.cpp
+    )
+elseif(APPLE)
+    # macOS: Native Cocoa/AppKit windowing with Vulkan via MoltenVK (Phase 2)
+    set(REXUI_PLATFORM_SOURCES
+        surface_macos.mm
+        window_macos.mm
+        windowed_app_context_macos.mm
+        windowed_app_main_macos.mm
+    )
+else()
+    set(REXUI_PLATFORM_SOURCES
+        surface_gnulinux.cpp
+        window_gtk.cpp
+        windowed_app_context_gtk.cpp
+    )
+endif()
+
+# Combine sources
+set(REXUI_SOURCES
+    ${REXUI_CORE_SOURCES}
+    ${REXUI_VULKAN_SOURCES}
+    ${REXUI_PLATFORM_SOURCES}
+)
+
+# Add Metal sources on macOS
+if(APPLE)
+    list(APPEND REXUI_SOURCES ${REXUI_METAL_SOURCES})
+endif()
+
+# Add D3D12 sources on Windows
+if(WIN32)
+    list(APPEND REXUI_SOURCES ${REXUI_D3D12_SOURCES})
+endif()
+
+add_library(rexui STATIC ${REXUI_SOURCES})
+add_library(rex::ui ALIAS rexui)
+
+target_include_directories(rexui PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_include_directories(rexui PRIVATE
+    ${CMAKE_SOURCE_DIR}  # For thirdparty/DirectXShaderCompiler includes
+    ${CMAKE_SOURCE_DIR}/src  # For ui/shaders/bytecode includes
+)
+
+target_link_libraries(rexui PUBLIC
+    rexcore
+    volk::volk
+    renderdoc
+    GPUOpen::VulkanMemoryAllocator
+    SPIRV-Tools-static
+    imgui::imgui
+)
+
+# Platform-specific dependencies
+if(WIN32)
+    # Windows libraries for DPI awareness, window composition, and DXGI
+    target_link_libraries(rexui PUBLIC
+        dwmapi      # DwmSetWindowAttribute for window corner preferences
+        Shcore      # Per-monitor DPI awareness APIs
+        dxgi        # CreateDXGIFactory1 for monitor enumeration
+    )
+    # DirectXShaderCompiler headers for D3D12 backend
+    target_include_directories(rexui PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/thirdparty/DirectXShaderCompiler/projects/dxilconv/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/thirdparty/DirectXShaderCompiler/include/dxc>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/dxc>
+    )
+elseif(APPLE)
+    # macOS: Native Cocoa/AppKit windowing with Vulkan via MoltenVK (Phase 2)
+    # No GTK dependency — using native Cocoa frameworks.
+    # Enable Objective-C++ for .mm sources.
+    set_source_files_properties(
+        surface_macos.mm
+        window_macos.mm
+        windowed_app_context_macos.mm
+        windowed_app_main_macos.mm
+        metal/metal_provider.mm
+        metal/metal_presenter.mm
+        metal/metal_immediate_drawer.mm
+        PROPERTIES COMPILE_FLAGS "-fobjc-arc"
+    )
+    target_link_libraries(rexui PUBLIC
+        "-framework Cocoa"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+        "-framework IOKit"
+        "-framework IOSurface"
+    )
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+    pkg_check_modules(X11_XCB REQUIRED x11-xcb)
+
+    target_include_directories(rexui PRIVATE
+        ${GTK3_INCLUDE_DIRS}
+        ${X11_XCB_INCLUDE_DIRS}
+    )
+    target_link_libraries(rexui PUBLIC
+        ${GTK3_LIBRARIES}
+        ${X11_XCB_LIBRARIES}
+    )
+endif()
+
+

@@ -1,0 +1,349 @@
+# ReXGlue SDK - Xbox 360 Recompilation Toolkit
+# Modern C++23 cross-platform SDK for recompiling Xbox 360 executables
+cmake_minimum_required(VERSION 3.25)
+
+project(ReXGlue
+    VERSION 0.1.0
+    LANGUAGES C CXX
+    DESCRIPTION "Xbox 360 Recompilation SDK"
+)
+
+# SDK install support
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Enforce Clang18 compiler
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "ReXGlue requires Clang compiler. Please set CMAKE_CXX_COMPILER to clang++")
+endif()
+
+if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "18.0")
+    message(FATAL_ERROR "ReXGlue requires Clang 18 or newer (found ${CMAKE_CXX_COMPILER_VERSION})")
+endif()
+
+# Enforce 64-bit architecture (x64 or ARM64)
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "ReXGlue only supports 64-bit architectures (x64 or ARM64)")
+endif()
+
+# Set C++23 standard
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_DEBUG_POSTFIX d)
+set(CMAKE_RELWITHDEBINFO_POSTFIX rd)
+
+# Position-independent code for all targets (required on macOS, beneficial everywhere).
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Use large code model on Linux for linking with very large recompiled executables (35MB+)
+# macOS ARM64: Clang doesn't support -mcmodel=large; Apple's linker uses different addressing.
+# macOS x86_64: -mcmodel=large is supported but we use PIC instead for broader compatibility.
+if(UNIX AND NOT APPLE)
+    add_compile_options(-mcmodel=large)
+endif()
+
+# Architecture-specific flags
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    # ARM64: no -march=sandybridge (x86-only), use appropriate ARM tuning
+    set(REX_ARCH_FLAGS "")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    set(REX_ARCH_FLAGS -march=sandybridge)
+endif()
+
+# On macOS with Homebrew LLVM, link against Homebrew's libc++ to resolve ABI symbols
+# (e.g. std::__1::__hash_memory) that don't exist in Apple's system libc++
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    get_filename_component(_CLANG_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(_LLVM_PREFIX "${_CLANG_DIR}/.." ABSOLUTE)
+    if(EXISTS "${_LLVM_PREFIX}/lib/c++/libc++.dylib")
+        link_directories("${_LLVM_PREFIX}/lib/c++")
+        add_link_options("-Wl,-rpath,${_LLVM_PREFIX}/lib/c++")
+    endif()
+endif()
+
+# Global compile options
+add_compile_options(
+    -Wall 
+    -Wextra
+    -fno-strict-aliasing
+    -ffp-model=strict
+    ${REX_ARCH_FLAGS}
+    $<$<CONFIG:DEBUG>:-g>
+    $<$<CONFIG:DEBUG>:-O0>
+    $<$<CONFIG:RELEASE>:-O3>
+    $<$<CONFIG:RELEASE>:-DNDEBUG>
+    -fno-char8_t
+)
+
+# Platform detection
+if(WIN32)
+    set(REX_PLATFORM "win-amd64")
+    add_compile_definitions(REX_PLATFORM_WINDOWS=1)
+elseif(APPLE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(REX_PLATFORM "macos-arm64")
+    else()
+        set(REX_PLATFORM "macos-amd64")
+    endif()
+    add_compile_definitions(REX_PLATFORM_MAC=1)
+elseif(UNIX)
+    set(REX_PLATFORM "linux-amd64")
+    add_compile_definitions(REX_PLATFORM_LINUX=1)
+else()
+    message(FATAL_ERROR "Unsupported platform. ReXGlue supports Windows, Linux, and macOS.")
+endif()
+
+# Output directories (multi-config appends /<Config>/ automatically)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${REX_PLATFORM}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${REX_PLATFORM}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${REX_PLATFORM}")
+
+# Build options (must be set before thirdparty for conditional dependencies)
+option(REXGLUE_BUILD_TESTS "Build PPC instruction tests" ON)
+option(REXGLUE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+# Graphics backend selection: D3D12 on Windows, Vulkan on Linux, Metal on macOS
+# Can be overridden to test Vulkan on Windows
+if(WIN32)
+    option(REXGLUE_USE_D3D12 "Use D3D12 graphics backend (Windows only)" ON)
+else()
+    option(REXGLUE_USE_D3D12 "Use D3D12 graphics backend (Windows only)" OFF)
+endif()
+
+# Metal backend option (macOS only, auto-enabled on Apple platforms)
+if(APPLE)
+    option(REXGLUE_USE_METAL "Use Metal graphics backend (macOS only)" ON)
+else()
+    option(REXGLUE_USE_METAL "Use Metal graphics backend (macOS only)" OFF)
+endif()
+
+# Sanitizer support for debugging memory corruption and undefined behavior
+if(REXGLUE_ENABLE_SANITIZERS)
+    message(STATUS "Enabling UndefinedBehaviorSanitizer (UBSan only - ASan conflicts with custom memory mapping)")
+    # Note: ASan doesn't work well with the custom mmap at 0x100000000, so we only use UBSan
+    add_compile_options(-fsanitize=undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=undefined)
+endif()
+
+find_package(spdlog CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(volk CONFIG REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(VulkanHeaders CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(date CONFIG REQUIRED)
+find_package(Snappy CONFIG REQUIRED)
+find_package(utf8cpp CONFIG REQUIRED)
+find_package(SDL2 CONFIG REQUIRED)
+find_package(SPIRV-Tools CONFIG REQUIRED)
+
+if(REXGLUE_BUILD_TESTS)
+    find_package(Catch2 CONFIG REQUIRED)
+    list(APPEND CMAKE_MODULE_PATH ${Catch2_DIR})
+endif()
+
+# Third-party dependencies (vendored sources only)
+add_subdirectory(thirdparty)
+
+
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
+add_subdirectory(src/core)
+add_subdirectory(src/filesystem)
+add_subdirectory(src/ui)
+add_subdirectory(src/input)
+add_subdirectory(src/audio)
+add_subdirectory(src/graphics)
+add_subdirectory(src/kernel)
+add_subdirectory(src/runtime)
+add_subdirectory(src/codegen)    
+add_subdirectory(src/rexglue)
+
+# Add tests subdirectory if tests are enabled
+if(REXGLUE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# GTA4 recompilation project (opt-in)
+option(REXGLUE_BUILD_GTA4 "Build GTA4 recompilation project" OFF)
+if(REXGLUE_BUILD_GTA4)
+    add_subdirectory(gta4-recomp)
+endif()
+
+# Print configuration summary
+message(STATUS "===========================================")
+message(STATUS "ReXGlue Configuration Summary:")
+message(STATUS "  Platform: ${REX_PLATFORM}")
+message(STATUS "  Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "  Configurations: ${CMAKE_CONFIGURATION_TYPES}")
+message(STATUS "  Output Dir: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+message(STATUS "  C++ Standard: C++${CMAKE_CXX_STANDARD}")
+if(REXGLUE_USE_D3D12)
+    message(STATUS "  Graphics Backend: D3D12")
+elseif(REXGLUE_USE_METAL)
+    message(STATUS "  Graphics Backend: Metal (+ Vulkan via MoltenVK)")
+else()
+    message(STATUS "  Graphics Backend: Vulkan")
+endif()
+message(STATUS "===========================================")
+
+#==========================================================
+# SDK Install/Export Rules
+#==========================================================
+set_target_properties(rexcore PROPERTIES EXPORT_NAME core)
+set_target_properties(rexfilesystem PROPERTIES EXPORT_NAME filesystem)
+set_target_properties(rexui PROPERTIES EXPORT_NAME ui)
+set_target_properties(rexinput PROPERTIES EXPORT_NAME input)
+set_target_properties(rexaudio PROPERTIES EXPORT_NAME audio)
+set_target_properties(rexgraphics PROPERTIES EXPORT_NAME graphics)
+set_target_properties(rexkernel PROPERTIES EXPORT_NAME kernel)
+set_target_properties(rexruntime PROPERTIES EXPORT_NAME runtime)
+set_target_properties(rexcodegen PROPERTIES EXPORT_NAME codegen)
+
+# Install all library targets, vendored deps, and the rexglue CLI tool
+install(TARGETS
+    # Rex SDK libraries
+    rexcore rexfilesystem rexui rexinput
+    rexaudio rexgraphics rexkernel rexruntime rexcodegen
+    # Vendored thirdparty libraries (required by SDK)
+    disruptorplus renderdoc simde tomlplusplus  # INTERFACE (header-only)
+    aes128 mspack disasm xxhash    # STATIC libraries
+    libavcodec libavutil           # FFmpeg (vendored build)
+    SPIRV glslang MachineIndependent GenericCodeGen  # glslang (vendored build)
+    # CLI tool
+    rexglue
+    EXPORT rexglueTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install vcpkg triplets for SDK consumers
+install(DIRECTORY triplets/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rexglue/triplets
+)
+
+# Bundle vcpkg dependencies into SDK prefix (self-contained SDK, no vcpkg needed by consumers)
+set(_VCPKG_PREFIX "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+
+# Static libraries (.a on Linux, .lib on Windows) - release
+# Exclude SPIRV-Tools sub-packages (opt/reduce/link/lint/diff are not used by the SDK)
+# and Catch2 (test-only, not needed by consumers)
+install(DIRECTORY "${_VCPKG_PREFIX}/lib/"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FILES_MATCHING
+    PATTERN "*.a"
+    PATTERN "*.lib"
+    PATTERN "pkgconfig" EXCLUDE
+    PATTERN "SPIRV-Tools-opt*" EXCLUDE
+    PATTERN "SPIRV-Tools-reduce*" EXCLUDE
+    PATTERN "SPIRV-Tools-link*" EXCLUDE
+    PATTERN "SPIRV-Tools-lint*" EXCLUDE
+    PATTERN "SPIRV-Tools-diff*" EXCLUDE
+    PATTERN "Catch2*" EXCLUDE
+)
+
+# TODO(tomc): it would be nice to deal with these differently. most flatten fine
+# vcpkg debug libs are in a separate debug/ subfolder
+install(DIRECTORY "${_VCPKG_PREFIX}/debug/lib/"
+    DESTINATION debug/${CMAKE_INSTALL_LIBDIR}
+    FILES_MATCHING
+    PATTERN "*.a"
+    PATTERN "*.lib"
+    PATTERN "pkgconfig" EXCLUDE
+    PATTERN "SPIRV-Tools-opt*" EXCLUDE
+    PATTERN "SPIRV-Tools-reduce*" EXCLUDE
+    PATTERN "SPIRV-Tools-link*" EXCLUDE
+    PATTERN "SPIRV-Tools-lint*" EXCLUDE
+    PATTERN "SPIRV-Tools-diff*" EXCLUDE
+    PATTERN "Catch2*" EXCLUDE
+)
+
+# Headers
+install(DIRECTORY "${_VCPKG_PREFIX}/include/"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# CMake package config files (for find_dependency resolution)
+install(DIRECTORY "${_VCPKG_PREFIX}/share/"
+    DESTINATION ${CMAKE_INSTALL_DATADIR}
+    PATTERN "pkgconfig" EXCLUDE
+    PATTERN "catch2" EXCLUDE
+    PATTERN "spirv-tools-opt" EXCLUDE
+    PATTERN "spirv-tools-reduce" EXCLUDE
+    PATTERN "spirv-tools-link" EXCLUDE
+    PATTERN "spirv-tools-lint" EXCLUDE
+    PATTERN "spirv-tools-diff" EXCLUDE
+)
+
+
+# Install public headers
+install(DIRECTORY include/rex
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install vendored header-only library headers
+install(DIRECTORY thirdparty/disruptorplus/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/disruptorplus
+)
+install(DIRECTORY thirdparty/renderdoc/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/renderdoc
+    FILES_MATCHING PATTERN "*.h"
+)
+install(DIRECTORY thirdparty/tomlplusplus/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY thirdparty/simde/simde
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+install(FILES
+    thirdparty/xxHash/xxhash.h
+    thirdparty/xxHash/xxh3.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install platform entry point sources for SDK consumers
+install(FILES
+    src/ui/windowed_app_main_win.cpp
+    src/ui/windowed_app_main_posix.cpp
+    src/ui/windowed_app_main_macos.mm
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rexglue
+)
+
+# Install DirectXShaderCompiler headers (Windows only, for D3D12 backend)
+if(WIN32)
+    install(FILES
+        thirdparty/DirectXShaderCompiler/projects/dxilconv/include/DxbcConverter.h
+        thirdparty/DirectXShaderCompiler/include/dxc/dxcapi.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dxc
+    )
+endif()
+
+# Generate and install package config files
+configure_package_config_file(
+    cmake/rexglueConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/rexglueConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rexglue
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/rexglueConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/rexglueConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/rexglueConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rexglue
+)
+
+# Export targets with rex:: namespace
+install(EXPORT rexglueTargets
+    FILE rexglueTargets.cmake
+    NAMESPACE rex::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rexglue
+)

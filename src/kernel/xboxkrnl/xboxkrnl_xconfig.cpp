@@ -1,0 +1,126 @@
+/**
+ ******************************************************************************
+ * Xenia : Xbox 360 Emulator Research Project                                 *
+ ******************************************************************************
+ * Copyright 2022 Ben Vanik. All rights reserved.                             *
+ * Released under the BSD license - see LICENSE in the root for more details. *
+ ******************************************************************************
+ *
+ * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+ */
+
+ // Disable warnings about unused parameters for kernel functions
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+#include <rex/cvar.h>
+#include <rex/logging.h>
+#include <rex/kernel/flags.h>
+#include <rex/kernel/kernel_state.h>
+#include <rex/kernel/user_module.h>
+#include <rex/runtime/guest/function.h>
+#include <rex/runtime/guest/types.h>
+#include <rex/kernel/xboxkrnl/private.h>
+#include <rex/kernel/xtypes.h>
+
+namespace rex::kernel::xboxkrnl {
+using namespace rex::runtime::guest;
+
+X_STATUS xeExGetXConfigSetting(uint16_t category, uint16_t setting,
+                               void* buffer, uint16_t buffer_size,
+                               uint16_t* required_size) {
+  uint16_t setting_size = 0;
+  alignas(uint32_t) uint8_t value[4];
+
+  // TODO(benvanik): have real structs here that just get copied from.
+  // https://free60project.github.io/wiki/XConfig.html
+  // https://github.com/oukiar/freestyledash/blob/master/Freestyle/Tools/Generic/ExConfig.h
+  switch (category) {
+    case 0x0002:
+      // XCONFIG_SECURED_CATEGORY
+      switch (setting) {
+        case 0x0002:  // XCONFIG_SECURED_AV_REGION
+          setting_size = 4;
+          memory::store_and_swap<uint32_t>(value, 0x00001000);  // USA/Canada
+          break;
+        default:
+          assert_unhandled_case(setting);
+          return X_STATUS_INVALID_PARAMETER_2;
+      }
+      break;
+    case 0x0003:
+      // XCONFIG_USER_CATEGORY
+      switch (setting) {
+        case 0x0001:  // XCONFIG_USER_TIME_ZONE_BIAS
+        case 0x0002:  // XCONFIG_USER_TIME_ZONE_STD_NAME
+        case 0x0003:  // XCONFIG_USER_TIME_ZONE_DLT_NAME
+        case 0x0004:  // XCONFIG_USER_TIME_ZONE_STD_DATE
+        case 0x0005:  // XCONFIG_USER_TIME_ZONE_DLT_DATE
+        case 0x0006:  // XCONFIG_USER_TIME_ZONE_STD_BIAS
+        case 0x0007:  // XCONFIG_USER_TIME_ZONE_DLT_BIAS
+          setting_size = 4;
+          // TODO(benvanik): get this value.
+          memory::store_and_swap<uint32_t>(value, 0);
+          break;
+        case 0x0009:  // XCONFIG_USER_LANGUAGE
+          setting_size = 4;
+          memory::store_and_swap<uint32_t>(value, REXCVAR_GET(user_language));
+          break;
+        case 0x000A:  // XCONFIG_USER_VIDEO_FLAGS
+          setting_size = 4;
+          memory::store_and_swap<uint32_t>(value, 0x00040000);
+          break;
+        case 0x000C:  // XCONFIG_USER_RETAIL_FLAGS
+          setting_size = 4;
+          // TODO(benvanik): get this value.
+          memory::store_and_swap<uint32_t>(value, 0);
+          break;
+        case 0x000E:  // XCONFIG_USER_COUNTRY
+          setting_size = 1;
+          value[0] = static_cast<uint8_t>(REXCVAR_GET(user_country));
+          break;
+        default:
+          assert_unhandled_case(setting);
+          return X_STATUS_INVALID_PARAMETER_2;
+      }
+      break;
+    default:
+      assert_unhandled_case(category);
+      return X_STATUS_INVALID_PARAMETER_1;
+  }
+
+  if (buffer) {
+    if (buffer_size < setting_size) {
+      return X_STATUS_BUFFER_TOO_SMALL;
+    }
+    std::memcpy(buffer, value, setting_size);
+  } else {
+    if (buffer_size) {
+      return X_STATUS_INVALID_PARAMETER_3;
+    }
+  }
+
+  if (required_size) {
+    *required_size = setting_size;
+  }
+
+  return X_STATUS_SUCCESS;
+}
+
+dword_result_t ExGetXConfigSetting_entry(word_t category, word_t setting,
+                                         lpvoid_t buffer_ptr,
+                                         word_t buffer_size,
+                                         lpword_t required_size_ptr) {
+  uint16_t required_size = 0;
+  X_STATUS result = xeExGetXConfigSetting(category, setting, buffer_ptr,
+                                          buffer_size, &required_size);
+
+  if (required_size_ptr) {
+    *required_size_ptr = required_size;
+  }
+
+  return result;
+}
+
+}  // namespace rex::kernel::xboxkrnl
+
+GUEST_FUNCTION_HOOK(__imp__ExGetXConfigSetting, rex::kernel::xboxkrnl::ExGetXConfigSetting_entry)
