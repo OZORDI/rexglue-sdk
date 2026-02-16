@@ -256,6 +256,11 @@ void CommandProcessor::WorkerThreadMain() {
           memory_->TranslatePhysical(read_ptr_writeback_ptr_), read_ptr_index_);
     }
 
+    // Update CP_RB_RPTR register (index 0x01C4) so the guest can see how far
+    // the GPU has consumed the ring buffer. Without this, games that poll the
+    // MMIO register instead of the writeback memory will spin forever.
+    register_file_->values[0x01C4] = read_ptr_index_;
+
     // FIXME: We're supposed to process the WAIT_UNTIL register at this point,
     // but no games seem to actually use it.
   }
@@ -927,6 +932,9 @@ bool CommandProcessor::ExecutePacketType3_XE_SWAP(memory::RingBuffer* reader,
                                                   uint32_t packet,
                                                   uint32_t count) {
   SCOPE_profile_cpu_f("gpu");
+
+  static int xe_swap_log_count = 0;
+  bool log_xe_swap = xe_swap_log_count < 32;
   
   rex::debug::Profiler::Flip();
 
@@ -935,15 +943,33 @@ bool CommandProcessor::ExecutePacketType3_XE_SWAP(memory::RingBuffer* reader,
   // interrupt.
   // 63 words here, but only the first has any data.
   uint32_t magic = reader->ReadAndSwap<memory::fourcc_t>();
+  if (magic != kSwapSignature) {
+    REXGPU_ERROR("PM4_XE_SWAP bad signature: {:08X} (expected {:08X})", magic,
+                 kSwapSignature);
+  }
   assert_true(magic == kSwapSignature);
 
   // TODO(benvanik): only swap frontbuffer ptr.
   uint32_t frontbuffer_ptr = reader->ReadAndSwap<uint32_t>();
   uint32_t frontbuffer_width = reader->ReadAndSwap<uint32_t>();
   uint32_t frontbuffer_height = reader->ReadAndSwap<uint32_t>();
+
+  if (log_xe_swap) {
+    REXGPU_INFO(
+        "PM4_XE_SWAP[{}] packet={:08X} count={} magic={:08X} frontbuffer={:08X} "
+        "width={} height={}",
+        xe_swap_log_count, packet, count, magic, frontbuffer_ptr,
+        frontbuffer_width, frontbuffer_height);
+  }
+
   reader->AdvanceRead((count - 4) * sizeof(uint32_t));
 
   IssueSwap(frontbuffer_ptr, frontbuffer_width, frontbuffer_height);
+
+  if (log_xe_swap) {
+    REXGPU_INFO("PM4_XE_SWAP[{}] IssueSwap dispatched", xe_swap_log_count);
+    xe_swap_log_count++;
+  }
 
   ++counter_;
   return true;

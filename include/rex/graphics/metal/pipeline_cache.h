@@ -20,10 +20,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include <rex/string/buffer.h>
 #include <rex/graphics/xenos.h>
 #include <rex/graphics/metal/dxbc_to_dxil_converter.h>
 #include <rex/graphics/metal/metal_shader_converter.h>
 #include <rex/graphics/metal/shader_cache.h>
+#include <rex/graphics/pipeline/shader/dxbc_translator.h>
 
 #ifdef __OBJC__
 @protocol MTLDevice;
@@ -57,7 +59,7 @@ class MetalPipelineCache {
 
   // Translate and compile a MetalShader to produce MTLFunction objects.
   // Returns true if the shader is now valid and ready for pipeline creation.
-  bool TranslateShader(MetalShader* shader);
+  bool TranslateShader(MetalShader* shader, uint64_t modification = 0);
 
   // =========================================================================
   // Pipeline state lookup/creation
@@ -68,6 +70,9 @@ class MetalPipelineCache {
     // Shader hashes.
     uint64_t vertex_shader_hash = 0;
     uint64_t pixel_shader_hash = 0;
+    uint64_t vertex_shader_modification = 0;
+    uint64_t pixel_shader_modification = 0;
+    uint64_t vertex_layout_hash = 0;
 
     // Render target formats (up to 4 MRT + depth).
     uint32_t color_formats[4] = {};      // MTLPixelFormat cast to uint32_t
@@ -159,6 +164,9 @@ class MetalPipelineCache {
   id<MTLFunction> resolve_compute_function() const {
     return resolve_compute_func_;
   }
+  id<MTLFunction> store_compute_function() const {
+    return store_compute_func_;
+  }
 #endif
 
  private:
@@ -166,15 +174,17 @@ class MetalPipelineCache {
 
   // Fallback shader library.
 #ifdef __OBJC__
-  id<MTLLibrary> fallback_library_ = nil;
-  id<MTLFunction> fallback_vertex_func_ = nil;
-  id<MTLFunction> fallback_fragment_func_ = nil;
-  id<MTLFunction> resolve_compute_func_ = nil;
+  id<MTLLibrary> fallback_library_ = nullptr;
+  id<MTLFunction> fallback_vertex_func_ = nullptr;
+  id<MTLFunction> fallback_fragment_func_ = nullptr;
+  id<MTLFunction> resolve_compute_func_ = nullptr;
+  id<MTLFunction> store_compute_func_ = nullptr;
 #else
   void* fallback_library_ = nullptr;
   void* fallback_vertex_func_ = nullptr;
   void* fallback_fragment_func_ = nullptr;
   void* resolve_compute_func_ = nullptr;
+  void* store_compute_func_ = nullptr;
 #endif
 
   // Cached render pipeline states.
@@ -197,11 +207,16 @@ class MetalPipelineCache {
                      DepthStencilKeyHash>
       depth_stencil_cache_;
 
+  // Last successfully materialized shader modification per shader hash.
+  std::unordered_map<uint64_t, uint64_t> active_shader_modifications_;
+
   // Shader storage path.
   std::filesystem::path shader_storage_root_;
   uint32_t current_title_id_ = 0;
 
   // Shader translation pipeline components.
+  std::unique_ptr<DxbcShaderTranslator> shader_translator_;
+  string::StringBuffer ucode_disasm_buffer_;
   DxbcToDxilConverter dxbc_to_dxil_converter_;
   MetalShaderConverter metal_shader_converter_;
   MetalShaderCache shader_cache_;

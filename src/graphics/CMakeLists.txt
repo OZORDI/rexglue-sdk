@@ -129,8 +129,8 @@ set(REXGRAPHICS_SOURCES
     ${REXGRAPHICS_VULKAN_SOURCES}
 )
 
-# Add Metal sources on macOS
-if(APPLE)
+# Direct Metal GPU backend sources (macOS only, opt-in via root option).
+if(APPLE AND REXGLUE_USE_METAL)
     list(APPEND REXGRAPHICS_SOURCES
         ${REXGRAPHICS_DXBC_THIRDPARTY_SOURCES_MAC}
         ${REXGRAPHICS_DXBC_SOURCES_MAC}
@@ -189,7 +189,10 @@ if(APPLE)
         "-framework QuartzCore"
         "-framework Foundation"
     )
-    target_compile_definitions(rexgraphics PUBLIC REX_HAS_METAL=1)
+    # REX_HAS_METAL gates runtime backend selection in kernel/runtime.cpp.
+    if(REXGLUE_USE_METAL)
+        target_compile_definitions(rexgraphics PUBLIC REX_HAS_METAL=1)
+    endif()
 endif()
 
 # D3D12 dependencies (Windows only)

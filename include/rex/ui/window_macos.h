@@ -59,13 +59,14 @@ class MacOSWindow : public Window {
       Surface::TypeFlags allowed_types) override;
   void RequestPaintImpl() override;
 
- private:
-  friend class MacOSWindowBridge;
-
+ public:
   // Called by the Objective-C delegate.
   void OnNativeResize();
   void OnNativeFocusChange(bool focused);
   void OnNativeCloseRequest();
+
+ private:
+  friend class MacOSWindowBridge;
 
   NSWindow* ns_window_ = nullptr;
   RexMetalView* metal_view_ = nullptr;

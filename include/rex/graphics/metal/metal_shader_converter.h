@@ -31,6 +31,8 @@
 
 namespace rex::graphics::metal {
 
+struct IRVersionedInputLayoutDescriptor;
+
 // Shader stage for Metal conversion.
 enum class MetalShaderStage {
   kVertex,
@@ -125,8 +127,10 @@ class MetalShaderConverter {
                           const std::vector<uint8_t>& dxil_data,
                           MetalShaderConversionResult& result,
                           MetalShaderReflectionInfo* reflection,
-                          bool enable_geometry_emulation,
-                          int input_topology);
+                          const IRVersionedInputLayoutDescriptor* input_layout = nullptr,
+                          std::vector<uint8_t>* stage_in_metallib = nullptr,
+                          bool enable_geometry_emulation = false,
+                          int input_topology = 0);
 
   // Set minimum GPU family and deployment target for compiled shaders.
   void SetMinimumTarget(uint32_t gpu_family, uint32_t os,
@@ -165,6 +169,7 @@ class MetalShaderConverter {
     void* IRMetalLibBinaryDestroy = nullptr;
     void* IRMetalLibGetBytecodeSize = nullptr;
     void* IRMetalLibGetBytecode = nullptr;
+    void* IRMetalLibSynthesizeStageInFunction = nullptr;
     void* IRRootSignatureCreateFromDescriptor = nullptr;
     void* IRRootSignatureDestroy = nullptr;
     void* IRErrorGetPayload = nullptr;
@@ -186,6 +191,8 @@ class MetalShaderConverter {
     void* IRShaderReflectionReleaseDomainInfo = nullptr;
     void* IRVersionedRootSignatureDescriptorCopyJSONString = nullptr;
     void* IRVersionedRootSignatureDescriptorReleaseString = nullptr;
+    void* IRInputLayoutDescriptor1CopyJSONString = nullptr;
+    void* IRInputLayoutDescriptor1ReleaseString = nullptr;
   };
   MSCFunctions msc_fn_{};
 

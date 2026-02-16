@@ -12,6 +12,7 @@
 #include <rex/graphics/metal/dxbc_to_dxil_converter.h>
 #include <rex/graphics/metal/metal_shader_converter.h>
 #include <rex/graphics/metal/shader_cache.h>
+#include <rex/graphics/flags.h>
 #include <rex/logging.h>
 
 namespace rex::graphics::metal {
@@ -20,7 +21,8 @@ MetalShader::MetalShader(xenos::ShaderType shader_type,
                          uint64_t ucode_data_hash,
                          const uint32_t* ucode_dwords,
                          size_t ucode_dword_count)
-    : Shader(shader_type, ucode_data_hash, ucode_dwords, ucode_dword_count) {}
+    : DxbcShader(shader_type, ucode_data_hash, ucode_dwords,
+                 ucode_dword_count) {}
 
 MetalShader::~MetalShader() {
 #ifdef __OBJC__
@@ -56,7 +58,16 @@ bool MetalShader::TranslateToMetal(id<MTLDevice> device,
 
   // Step 2: Convert DXIL → MetalLib via Apple's Metal Shader Converter.
   MetalShaderConversionResult msc_result;
-  if (!metal_converter.Convert(type(), dxil_data_, msc_result)) {
+  reflection_info_ = MetalShaderReflectionInfo{};
+  bool conversion_ok = false;
+  if (type() == xenos::ShaderType::kVertex) {
+    conversion_ok = metal_converter.ConvertWithStageEx(
+        MetalShaderStage::kVertex, dxil_data_, msc_result, &reflection_info_,
+        nullptr, nullptr, false, 0);
+  } else {
+    conversion_ok = metal_converter.Convert(type(), dxil_data_, msc_result);
+  }
+  if (!conversion_ok) {
     REXGPU_ERROR("MetalShader: DXIL → Metal conversion failed: {}",
                  msc_result.error_message);
     return false;

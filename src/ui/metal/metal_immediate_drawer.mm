@@ -122,7 +122,7 @@ bool MetalImmediateDrawer::Initialize() {
                                                 options:nil
                                                   error:&error];
   if (!library) {
-    XELOGE("MetalImmediateDrawer: Failed to compile shaders: {}",
+    REXLOG_ERROR("MetalImmediateDrawer: Failed to compile shaders: {}",
            error ? [[error localizedDescription] UTF8String] : "unknown");
     return false;
   }
@@ -132,7 +132,7 @@ bool MetalImmediateDrawer::Initialize() {
   id<MTLFunction> fragment_func =
       [library newFunctionWithName:@"imgui_fragment"];
   if (!vertex_func || !fragment_func) {
-    XELOGE("MetalImmediateDrawer: Failed to find shader functions");
+    REXLOG_ERROR("MetalImmediateDrawer: Failed to find shader functions");
     return false;
   }
 
@@ -181,7 +181,7 @@ bool MetalImmediateDrawer::Initialize() {
     pipeline_state_triangle_ =
         [device newRenderPipelineStateWithDescriptor:desc error:&error];
     if (!pipeline_state_triangle_) {
-      XELOGE("MetalImmediateDrawer: Failed to create triangle pipeline: {}",
+      REXLOG_ERROR("MetalImmediateDrawer: Failed to create triangle pipeline: {}",
              error ? [[error localizedDescription] UTF8String] : "unknown");
       return false;
     }
@@ -267,7 +267,7 @@ bool MetalImmediateDrawer::Initialize() {
     index_buffer_.label = @"ImGui_IndexBuffer";
   }
 
-  XELOGI("MetalImmediateDrawer: Initialized with full pipeline");
+  REXLOG_INFO("MetalImmediateDrawer: Initialized with full pipeline");
   return true;
 }
 
@@ -296,7 +296,7 @@ std::unique_ptr<ImmediateTexture> MetalImmediateDrawer::CreateTexture(
 
   id<MTLTexture> mtl_texture = [device newTextureWithDescriptor:desc];
   if (!mtl_texture) {
-    XELOGE("MetalImmediateDrawer: Failed to create {}x{} texture",
+    REXLOG_ERROR("MetalImmediateDrawer: Failed to create {}x{} texture",
            width, height);
     return nullptr;
   }
@@ -353,7 +353,7 @@ void MetalImmediateDrawer::BeginDrawBatch(const ImmediateDrawBatch& batch) {
   // Upload vertices to the dynamic buffer.
   size_t vertex_bytes = batch.vertex_count * sizeof(ImmediateVertex);
   if (vertex_bytes > kVertexBufferSize) {
-    XELOGE("MetalImmediateDrawer: Batch too large ({} bytes) for vertex "
+    REXLOG_ERROR("MetalImmediateDrawer: Batch too large ({} bytes) for vertex "
            "buffer ({} bytes) — skipping",
            vertex_bytes, kVertexBufferSize);
     return;
@@ -377,7 +377,7 @@ void MetalImmediateDrawer::BeginDrawBatch(const ImmediateDrawBatch& batch) {
   if (batch_has_indices_) {
     size_t index_bytes = batch.index_count * sizeof(uint16_t);
     if (batch_index_offset_ + index_bytes > kIndexBufferSize) {
-      XELOGW("MetalImmediateDrawer: Index buffer overflow");
+      REXLOG_WARN("MetalImmediateDrawer: Index buffer overflow");
       batch_index_offset_ = 0;
       batch_index_start_ = 0;
     }

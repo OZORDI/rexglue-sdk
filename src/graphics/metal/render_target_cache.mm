@@ -11,17 +11,21 @@
 #include <rex/graphics/metal/render_target_cache.h>
 #include <rex/graphics/metal/command_processor.h>
 #include <rex/graphics/metal/pipeline_cache.h>
+#include <rex/graphics/flags.h>
 #include <rex/graphics/registers.h>
 #include <rex/graphics/xenos.h>
 #include <rex/ui/metal/metal_provider.h>
 #include <rex/logging.h>
+#include <rex/xenia_logging_compat.h>
 
 namespace rex::graphics::metal {
 
 MetalRenderTargetCache::MetalRenderTargetCache(
     MetalCommandProcessor& command_processor,
-    const RegisterFile& register_file)
-    : RenderTargetCache(register_file),
+    const RegisterFile& register_file,
+    const memory::Memory& memory)
+    : RenderTargetCache(register_file, memory,
+                        nullptr, 1, 1),
       command_processor_(command_processor) {}
 
 MetalRenderTargetCache::~MetalRenderTargetCache() {
@@ -86,6 +90,22 @@ bool MetalRenderTargetCache::Initialize() {
     }
   }
 
+  id<MTLFunction> store_func = pipeline_cache.store_compute_function();
+  if (store_func) {
+    NSError* pso_error = nil;
+    store_pso_ =
+        [device newComputePipelineStateWithFunction:store_func
+                                             error:&pso_error];
+    if (!store_pso_) {
+      XELOGW("MetalRenderTargetCache: Failed to create store compute PSO: {}"
+             " — render-pass-end EDRAM store will be unavailable",
+             pso_error ? [[pso_error localizedDescription] UTF8String]
+                       : "unknown");
+    } else {
+      XELOGI("MetalRenderTargetCache: Store compute PSO created");
+    }
+  }
+
   return true;
 }
 
@@ -93,6 +113,7 @@ void MetalRenderTargetCache::Shutdown(bool from_destructor) {
   ClearCache();
   memoryless_cache_.clear();
   resolve_pso_ = nil;
+  store_pso_ = nil;
   edram_buffer_ = nil;
   use_tile_shading_ = false;
 }
@@ -116,6 +137,31 @@ void MetalRenderTargetCache::CompletedSubmissionUpdated() {
     } else {
       ++it;
     }
+  }
+}
+
+uint32_t MetalRenderTargetCache::ColorFormatBytesPerPixel(
+    xenos::ColorRenderTargetFormat format) {
+  switch (format) {
+    case xenos::ColorRenderTargetFormat::k_16_16:
+    case xenos::ColorRenderTargetFormat::k_16_16_FLOAT:
+    case xenos::ColorRenderTargetFormat::k_16_16_16_16:
+    case xenos::ColorRenderTargetFormat::k_16_16_16_16_FLOAT:
+    case xenos::ColorRenderTargetFormat::k_32_32_FLOAT:
+    case xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16:
+      return 8;
+    default:
+      return 4;
+  }
+}
+
+uint32_t MetalRenderTargetCache::DepthFormatBytesPerPixel(
+    xenos::DepthRenderTargetFormat format) {
+  switch (format) {
+    case xenos::DepthRenderTargetFormat::kD24S8:
+    case xenos::DepthRenderTargetFormat::kD24FS8:
+    default:
+      return 4;
   }
 }
 
@@ -352,13 +398,78 @@ void MetalRenderTargetCache::MarkRendered(
 
 void MetalRenderTargetCache::StoreRenderTargetToEdram(
     id<MTLRenderCommandEncoder> encoder, const RenderTarget& rt) {
-  // TODO(metal): After a render pass ends, the RT contents need to be
-  // written back to the EDRAM buffer. On Apple Silicon with tile shading,
-  // this can be done efficiently using imageblocks. For now, the EDRAM buffer
-  // is treated as a backing store that gets updated during resolve/copy.
-  //
-  // In the current architecture, render targets are MTLTextures in GPU-private
-  // memory. EDRAM is only updated during IssueCopy via the resolve kernel.
+  (void)encoder;
+
+  if (!REXCVAR_GET(metal_edram_store_on_renderpass_end)) {
+    return;
+  }
+  if (!rt.texture || !edram_buffer_ || !store_pso_) {
+    return;
+  }
+  if (rt.texture.storageMode == MTLStorageModeMemoryless) {
+    // Memoryless targets have no DRAM backing. A dedicated tile-imageblock
+    // path is needed for correctness here.
+    return;
+  }
+  if (rt.msaa != xenos::MsaaSamples::k1X) {
+    // Multisample store is not implemented in this simplified path.
+    return;
+  }
+  if (rt.is_depth) {
+    // Depth/stencil store needs dedicated packing and format handling.
+    return;
+  }
+
+  id<MTLCommandBuffer> command_buffer = command_processor_.GetCurrentCommandBuffer();
+  if (!command_buffer) {
+    return;
+  }
+  id<MTLComputeCommandEncoder> compute = [command_buffer computeCommandEncoder];
+  if (!compute) {
+    return;
+  }
+
+  [compute setComputePipelineState:store_pso_];
+  [compute setTexture:rt.texture atIndex:0];
+  [compute setBuffer:edram_buffer_ offset:0 atIndex:0];
+
+  struct StoreParams {
+    uint32_t edram_base;
+    uint32_t edram_pitch;
+    uint32_t width;
+    uint32_t height;
+    uint32_t bytes_per_pixel;
+  };
+
+  uint32_t bytes_per_pixel = ColorFormatBytesPerPixel(rt.color_format);
+  uint32_t edram_base_bytes = rt.edram_base << 2;
+  uint32_t edram_pitch_bytes =
+      rt.pitch_tiles * xenos::kEdramTileWidthSamples * bytes_per_pixel;
+  if (edram_base_bytes >= kEdramSize) {
+    [compute endEncoding];
+    return;
+  }
+
+  StoreParams params;
+  params.edram_base = edram_base_bytes;
+  params.edram_pitch = edram_pitch_bytes;
+  params.width = rt.width_pixels;
+  params.height = rt.height_pixels;
+  params.bytes_per_pixel = bytes_per_pixel;
+  [compute setBytes:&params length:sizeof(params) atIndex:1];
+
+  MTLSize threads_per_threadgroup =
+      MTLSizeMake(std::min(uint32_t(16), rt.width_pixels),
+                  std::min(uint32_t(16), rt.height_pixels), 1);
+  MTLSize threadgroups =
+      MTLSizeMake((rt.width_pixels + threads_per_threadgroup.width - 1) /
+                      threads_per_threadgroup.width,
+                  (rt.height_pixels + threads_per_threadgroup.height - 1) /
+                      threads_per_threadgroup.height,
+                  1);
+  [compute dispatchThreadgroups:threadgroups
+          threadsPerThreadgroup:threads_per_threadgroup];
+  [compute endEncoding];
 }
 
 bool MetalRenderTargetCache::ResolveEdramToTexture(
@@ -431,14 +542,17 @@ bool MetalRenderTargetCache::ResolveEdramToTexture(
 uint32_t MetalRenderTargetCache::GetCurrentRenderTargets(
     RenderTarget color_targets[4], RenderTarget& depth_target,
     bool& depth_enabled) {
-  auto& regs = register_file_;
+  const auto& regs = register_file();
 
   auto rb_modecontrol = regs.Get<reg::RB_MODECONTROL>();
   auto rb_surface_info = regs.Get<reg::RB_SURFACE_INFO>();
   auto rb_color_info = regs.Get<reg::RB_COLOR_INFO>();
-  auto rb_color1_info = regs.Get<reg::RB_COLOR1_INFO>();
-  auto rb_color2_info = regs.Get<reg::RB_COLOR2_INFO>();
-  auto rb_color3_info = regs.Get<reg::RB_COLOR3_INFO>();
+  auto rb_color1_info =
+      regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[1]);
+  auto rb_color2_info =
+      regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[2]);
+  auto rb_color3_info =
+      regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[3]);
   auto rb_depth_info = regs.Get<reg::RB_DEPTH_INFO>();
 
   uint32_t surface_pitch_tiles = rb_surface_info.surface_pitch;
@@ -461,15 +575,14 @@ uint32_t MetalRenderTargetCache::GetCurrentRenderTargets(
   uint32_t viewport_height = 720;  // Default
   auto pa_cl_vte = regs.Get<reg::PA_CL_VTE_CNTL>();
   if (pa_cl_vte.vport_y_scale_ena) {
-    auto pa_cl_vport = regs.Get<reg::PA_CL_VPORT_YSCALE>();
-    float y_scale = pa_cl_vport.vport_yscale;
+    float y_scale = regs.Get<float>(XE_GPU_REG_PA_CL_VPORT_YSCALE);
     if (y_scale != 0.0f) {
       viewport_height = uint32_t(std::abs(y_scale) * 2.0f);
     }
   }
   viewport_height = std::max(viewport_height, 1u);
 
-  if (rb_modecontrol.edram_mode == xenos::ModeControl::kColorDepth) {
+  if (rb_modecontrol.edram_mode == xenos::EdramMode::kColorDepth) {
     // Determine how many MRTs the game actually enabled by checking
     // RB_COLOR_MASK — if all channels are masked off, the MRT is unused.
     auto rb_color_mask = regs.Get<reg::RB_COLOR_MASK>();
@@ -532,8 +645,8 @@ uint32_t MetalRenderTargetCache::GetCurrentRenderTargets(
       surface_pitch_tiles * xenos::kEdramTileWidthSamples;
   depth_target.height_pixels = viewport_height;
   depth_enabled =
-      (rb_modecontrol.edram_mode == xenos::ModeControl::kColorDepth) ||
-      (rb_modecontrol.edram_mode == xenos::ModeControl::kDepth);
+      (rb_modecontrol.edram_mode == xenos::EdramMode::kColorDepth) ||
+      (rb_modecontrol.edram_mode == xenos::EdramMode::kDepthOnly);
 
   if (depth_enabled) {
     depth_target.texture = GetOrCreateRenderTargetTexture(

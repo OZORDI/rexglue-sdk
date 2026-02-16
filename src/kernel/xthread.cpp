@@ -28,6 +28,7 @@
 #include <rex/runtime/guest/context.h>
 #include <rex/kernel/kernel_state.h>
 #include <rex/kernel/user_module.h>
+
 #include <rex/kernel/xevent.h>
 #include <rex/kernel/xmutant.h>
 
@@ -562,9 +563,23 @@ void XThread::Execute() {
   // Initialize host FPSCR with all FP exceptions masked
   ctx.fpscr.InitHost();
 
+  // Set Liberty's thread-local context so hooks can access registers.
+  g_ppcContext = &ctx;
+
   // Execute the function
   REXKRNL_DEBUG("XThread::Execute - Calling function at {:08X}", address);
-  func(ctx, base);
+  try {
+    func(ctx, base);
+  } catch (const thread_terminate_exception& e) {
+    // ExTerminateThread throws this to unwind cleanly through SEH catch
+    // blocks without using pthread_exit (which corrupts state on macOS).
+    g_ppcContext = nullptr;
+    Exit(e.exit_code());
+    return;
+  }
+
+  // Clear after execution.
+  g_ppcContext = nullptr;
 
   // Get the return value from r3
   exit_code = static_cast<int>(ctx.r3.u32);

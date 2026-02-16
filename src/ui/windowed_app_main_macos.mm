@@ -16,6 +16,9 @@
 #include <string>
 #include <vector>
 
+#include <absl/flags/parse.h>
+
+#include <rex/cvar.h>
 #include <rex/logging.h>
 #include <rex/filesystem.h>
 #include <rex/ui/windowed_app.h>
@@ -28,14 +31,12 @@ namespace {
 // TEMP: Replace with CVAR system
 // Match positional args to registered option names
 std::map<std::string, std::string> MatchPositionalArgs(
-    int argc, char** argv,
+    const std::vector<std::string>& args,
     const std::vector<std::string>& option_names) {
   std::map<std::string, std::string> result;
-  // Skip argv[0] (program name)
-  size_t arg_count = argc > 1 ? static_cast<size_t>(argc - 1) : 0;
-  size_t count = std::min(arg_count, option_names.size());
+  size_t count = std::min(args.size(), option_names.size());
   for (size_t i = 0; i < count; ++i) {
-    result[option_names[i]] = argv[i + 1];
+    result[option_names[i]] = args[i];
   }
   return result;
 }
@@ -69,9 +70,19 @@ extern "C" int main(int argc, char** argv) {
     std::unique_ptr<rex::ui::WindowedApp> app =
         rex::ui::GetWindowedAppCreator()(app_context);
 
+    rex::cvar::Init(argc, argv);
+    rex::cvar::ApplyEnvironment();
+    std::vector<char*> remaining_args = absl::ParseCommandLine(argc, argv);
+    std::vector<std::string> positional_args;
+    if (remaining_args.size() > 1) {
+      positional_args.reserve(remaining_args.size() - 1);
+      for (size_t i = 1; i < remaining_args.size(); ++i) {
+        positional_args.emplace_back(remaining_args[i]);
+      }
+    }
+
     // TEMP: Replace with CVAR system - parse positional arguments
-    auto parsed =
-        MatchPositionalArgs(argc, argv, app->GetPositionalOptions());
+    auto parsed = MatchPositionalArgs(positional_args, app->GetPositionalOptions());
     app->SetParsedArguments(std::move(parsed));
 
     // Initialize logging.

@@ -476,9 +476,12 @@ T GuestToHostFunction(const TFunction& func, TArgs&&... argv) {
 // Guest Function Hooking and Aliasing Macros
 //=============================================================================
 
-// Hook a PPC function name to a native C++ function
+// Hook a PPC function name to a native C++ function.
+// Uses weak linkage so that consumer executables (e.g. LibertyRecomp) can
+// override individual hooks with strong definitions while RexGlue's
+// implementations serve as fallbacks for hooks the consumer doesn't define.
 #define GUEST_FUNCTION_HOOK(subroutine, function) \
-    extern "C" PPC_FUNC(subroutine) { rex::runtime::guest::HostToGuestFunction<function>(ctx, base); }
+    extern "C" PPC_WEAK_FUNC(subroutine) { rex::runtime::guest::HostToGuestFunction<function>(ctx, base); }
 
 // Create a simple stub that does nothing (with call counter)
 #define GUEST_FUNCTION_STUB(subroutine) \

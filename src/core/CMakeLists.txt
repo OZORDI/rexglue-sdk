@@ -1,6 +1,11 @@
 # rexcore - Core utilities library
 # Foundation types, data structures, and threading primitives
 
+# Allow embedding in a parent project via REXGLUE_SDK_ROOT
+if(NOT DEFINED REXGLUE_SDK_ROOT)
+    set(REXGLUE_SDK_ROOT "${CMAKE_SOURCE_DIR}")
+endif()
+
 add_library(rexcore STATIC
     arena.cpp
     bit_map.cpp
@@ -45,12 +50,12 @@ elseif(UNIX)
 endif()
 
 target_include_directories(rexcore PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${REXGLUE_SDK_ROOT}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 target_include_directories(rexcore PRIVATE
-    ${PROJECT_SOURCE_DIR}
+    ${REXGLUE_SDK_ROOT}
 )
 
 if(UNIX)
@@ -61,9 +66,14 @@ if(UNIX)
     endif()
 endif()
 
+# Allow parent project to override fmt target (e.g. for vcpkg compatibility)
+if(NOT DEFINED REXGLUE_FMT_TARGET)
+    set(REXGLUE_FMT_TARGET fmt::fmt)
+endif()
+
 target_link_libraries(rexcore
     PUBLIC 
-        fmt::fmt 
+        ${REXGLUE_FMT_TARGET}
         date::date 
         simde 
         absl::flags 

@@ -31,3 +31,12 @@ REXCVAR_DEFINE_BOOL(metal_validation_enabled, false,
     "Enable Metal API validation layer (macOS)", "GPU");
 REXCVAR_DEFINE_INT32(metal_gpu_family_override, -1,
     "Override Metal GPU family detection (-1 = auto)", "GPU");
+REXCVAR_DEFINE_BOOL(metal_vertex_layout_from_fetch, false,
+    "Derive Metal vertex layouts from Xenos fetch constants for translated shaders", "GPU");
+REXCVAR_DEFINE_BOOL(metal_rectlist_vs_expand, false,
+    "Enable rectangle-list expansion path for Metal (requires translated shader support)", "GPU");
+REXCVAR_DEFINE_BOOL(metal_rectlist_vs_expand_strict, false,
+    "Fail closed when Metal rectangle-list VS expansion variant is unavailable",
+    "GPU");
+REXCVAR_DEFINE_BOOL(metal_edram_store_on_renderpass_end, false,
+    "Store active render targets back to EDRAM when ending a Metal render pass", "GPU");

@@ -1,6 +1,11 @@
 # rexkernel: Kernel emulation (ported from Xenia)
 # Namespace: rex::kernel
 
+# Allow embedding in a parent project via REXGLUE_SDK_ROOT
+if(NOT DEFINED REXGLUE_SDK_ROOT)
+    set(REXGLUE_SDK_ROOT "${CMAKE_SOURCE_DIR}")
+endif()
+
 set(REXKERNEL_SOURCES
     runtime.cpp
     xmemory.cpp
@@ -36,7 +41,7 @@ set(REXKERNEL_SOURCES
     xam/xam_debug.cpp
     xam/xam_enum.cpp
     xam/xam_info.cpp
-    # xam/xam_input.cpp           # Disabled: depends on rexinput
+    xam/xam_input.cpp
     xam/xam_locale.cpp
     xam/xam_msg.cpp
     xam/xam_net.cpp
@@ -77,19 +82,19 @@ set(REXKERNEL_SOURCES
     # xboxkrnl/xboxkrnl_usbcam.cpp  # TODO: lol eventually.
     xboxkrnl/xboxkrnl_video.cpp
     xboxkrnl/xboxkrnl_xconfig.cpp
-    # xboxkrnl/xboxkrnl_audio.cpp       # Disabled: depends on rexaudio
-    # xboxkrnl/xboxkrnl_audio_xma.cpp   # Disabled: depends on rexaudio
+    xboxkrnl/xboxkrnl_audio.cpp
+    xboxkrnl/xboxkrnl_audio_xma.cpp
 )
 
 add_library(rexkernel STATIC ${REXKERNEL_SOURCES})
 add_library(rex::kernel ALIAS rexkernel)
 
 target_include_directories(rexkernel PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${REXGLUE_SDK_ROOT}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(rexkernel PRIVATE
-    ${CMAKE_SOURCE_DIR}/thirdparty
+    ${REXGLUE_SDK_ROOT}/thirdparty
 )
 
 target_link_libraries(rexkernel
@@ -99,13 +104,23 @@ target_link_libraries(rexkernel
         rexruntime
         simde
     PRIVATE
-        # rexgraphics rexinput rexaudio - disabled for headless codegen build
+        rexgraphics rexinput rexaudio
         aes128
 )
 
+if(REXGLUE_USE_METAL)
+    target_compile_definitions(rexkernel PUBLIC REX_HAS_METAL=1)
+endif()
+
 # Headless mode: no graphics/input/audio subsystems
-target_compile_definitions(rexkernel PUBLIC REX_HEADLESS=1
-)
+# Default ON for standalone RexGlue builds, but consumers (e.g. LibertyRecomp)
+# can set REXGLUE_HEADLESS=OFF before add_subdirectory() to get full subsystems.
+if(NOT DEFINED REXGLUE_HEADLESS)
+    set(REXGLUE_HEADLESS OFF)
+endif()
+if(REXGLUE_HEADLESS)
+    target_compile_definitions(rexkernel PUBLIC REX_HEADLESS=1)
+endif()
 
 if(WIN32)
     target_link_libraries(rexkernel PRIVATE ws2_32)

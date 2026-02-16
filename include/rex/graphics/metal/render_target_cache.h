@@ -35,11 +35,19 @@ class MetalCommandProcessor;
 class MetalRenderTargetCache : public RenderTargetCache {
  public:
   MetalRenderTargetCache(MetalCommandProcessor& command_processor,
-                         const RegisterFile& register_file);
+                         const RegisterFile& register_file,
+                         const memory::Memory& memory);
   ~MetalRenderTargetCache() override;
 
   bool Initialize();
   void Shutdown(bool from_destructor = false);
+
+  // Pure virtual overrides from RenderTargetCache
+  Path GetPath() const override { return Path::kHostRenderTargets; }
+  RenderTargetCache::RenderTarget* CreateRenderTarget(
+      RenderTargetCache::RenderTargetKey key) override { return nullptr; }
+  bool IsHostDepthEncodingDifferent(
+      xenos::DepthRenderTargetFormat format) const override { return false; }
 
   void CompletedSubmissionUpdated();
   void BeginSubmission();
@@ -108,6 +116,13 @@ class MetalRenderTargetCache : public RenderTargetCache {
   static uint32_t DepthFormatToMetal(
       xenos::DepthRenderTargetFormat format);
 
+  // Bytes per pixel for Xenos RT formats used by the simplified EDRAM store /
+  // resolve paths.
+  static uint32_t ColorFormatBytesPerPixel(
+      xenos::ColorRenderTargetFormat format);
+  static uint32_t DepthFormatBytesPerPixel(
+      xenos::DepthRenderTargetFormat format);
+
   // =========================================================================
   // EDRAM resolve
   // =========================================================================
@@ -158,9 +173,11 @@ class MetalRenderTargetCache : public RenderTargetCache {
 #ifdef __OBJC__
   id<MTLBuffer> edram_buffer_ = nil;
   id<MTLComputePipelineState> resolve_pso_ = nil;
+  id<MTLComputePipelineState> store_pso_ = nil;
 #else
   void* edram_buffer_ = nullptr;
   void* resolve_pso_ = nullptr;
+  void* store_pso_ = nullptr;
 #endif
 
   // Whether Apple Silicon tile shading is in use.

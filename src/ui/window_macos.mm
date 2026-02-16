@@ -136,26 +136,17 @@ MacOSWindow::~MacOSWindow() {
   EnterDestructor();
   if (ns_window_) {
     // Detach the delegate so it doesn't call back into freed memory.
-    RexWindowDelegate* delegate =
-        (__bridge RexWindowDelegate*)window_delegate_;
-    delegate.cppWindow = nullptr;
-    [(__bridge NSWindow*)ns_window_ close];
-    // Release our bridge-retained references.
-    CFRelease(ns_window_);
-    ns_window_ = nullptr;
-    CFRelease(window_delegate_);
-    window_delegate_ = nullptr;
-    CFRelease(metal_view_);
-    metal_view_ = nullptr;
+    window_delegate_.cppWindow = nullptr;
+    [ns_window_ close];
+    ns_window_ = nil;
+    window_delegate_ = nil;
+    metal_view_ = nil;
   }
 }
 
 uint32_t MacOSWindow::GetLatestDpiImpl() const {
   if (ns_window_) {
-    NSWindow* window = (__bridge NSWindow*)ns_window_;
-    // macOS "medium" DPI = 72 points per inch.
-    // backingScaleFactor is 2.0 on Retina.
-    return static_cast<uint32_t>(72.0 * window.backingScaleFactor);
+    return static_cast<uint32_t>(72.0 * ns_window_.backingScaleFactor);
   }
   return 72;
 }
@@ -190,10 +181,10 @@ bool MacOSWindow::OpenImpl() {
     delegate.cppWindow = this;
     [window setDelegate:delegate];
 
-    // Retain references via CFBridgingRetain so ARC doesn't release them.
-    ns_window_ = (NSWindow*)CFBridgingRetain(window);
-    metal_view_ = (RexMetalView*)CFBridgingRetain(metal_view);
-    window_delegate_ = (RexWindowDelegate*)CFBridgingRetain(delegate);
+    // ARC retains these automatically via strong member pointers.
+    ns_window_ = window;
+    metal_view_ = metal_view;
+    window_delegate_ = delegate;
 
     // Show the window.
     [window makeKeyAndOrderFront:nil];
@@ -234,16 +225,11 @@ void MacOSWindow::RequestCloseImpl() {
     }
     if (ns_window_) {
       // Detach delegate before closing.
-      RexWindowDelegate* delegate =
-          (__bridge RexWindowDelegate*)window_delegate_;
-      delegate.cppWindow = nullptr;
-      [(__bridge NSWindow*)ns_window_ close];
-      CFRelease(ns_window_);
-      ns_window_ = nullptr;
-      CFRelease(window_delegate_);
-      window_delegate_ = nullptr;
-      CFRelease(metal_view_);
-      metal_view_ = nullptr;
+      window_delegate_.cppWindow = nullptr;
+      [ns_window_ close];
+      ns_window_ = nil;
+      window_delegate_ = nil;
+      metal_view_ = nil;
     }
     OnAfterClose();
   }
@@ -251,25 +237,23 @@ void MacOSWindow::RequestCloseImpl() {
 
 void MacOSWindow::ApplyNewFullscreen() {
   if (ns_window_) {
-    NSWindow* window = (__bridge NSWindow*)ns_window_;
     bool currently_fullscreen =
-        (window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+        (ns_window_.styleMask & NSWindowStyleMaskFullScreen) != 0;
     if (IsFullscreen() != currently_fullscreen) {
-      [window toggleFullScreen:nil];
+      [ns_window_ toggleFullScreen:nil];
     }
   }
 }
 
 void MacOSWindow::ApplyNewTitle() {
   if (ns_window_) {
-    [(__bridge NSWindow*)ns_window_
-        setTitle:[NSString stringWithUTF8String:GetTitle().c_str()]];
+    [ns_window_ setTitle:[NSString stringWithUTF8String:GetTitle().c_str()]];
   }
 }
 
 void MacOSWindow::FocusImpl() {
   if (ns_window_) {
-    [(__bridge NSWindow*)ns_window_ makeKeyAndOrderFront:nil];
+    [ns_window_ makeKeyAndOrderFront:nil];
   }
 }
 
@@ -281,9 +265,8 @@ std::unique_ptr<Surface> MacOSWindow::CreateSurfaceImpl(
   if (!metal_view_) {
     return nullptr;
   }
-  RexMetalView* view = (__bridge RexMetalView*)metal_view_;
   return std::make_unique<MacOSMetalSurface>(
-      (NSView*)metal_view_, view.metalLayer);
+      (NSView*)metal_view_, metal_view_.metalLayer);
 }
 
 void MacOSWindow::RequestPaintImpl() {
@@ -291,7 +274,7 @@ void MacOSWindow::RequestPaintImpl() {
     // Mark the view as needing display; the Presenter drives actual
     // rendering via Vulkan command submission, so this is mostly a
     // hint to the compositor.
-    [(__bridge RexMetalView*)metal_view_ setNeedsDisplay:YES];
+    [metal_view_ setNeedsDisplay:YES];
   }
   OnPaint();
 }
@@ -301,8 +284,7 @@ void MacOSWindow::RequestPaintImpl() {
 void MacOSWindow::OnNativeResize() {
   if (!metal_view_) return;
   WindowDestructionReceiver destruction_receiver(this);
-  RexMetalView* view = (__bridge RexMetalView*)metal_view_;
-  NSSize backing = [view convertSizeToBacking:view.bounds.size];
+  NSSize backing = [metal_view_ convertSizeToBacking:metal_view_.bounds.size];
   OnActualSizeUpdate(static_cast<uint32_t>(backing.width),
                      static_cast<uint32_t>(backing.height),
                      destruction_receiver);

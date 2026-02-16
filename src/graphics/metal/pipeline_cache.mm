@@ -15,6 +15,7 @@
 #include <rex/graphics/metal/dxbc_to_dxil_converter.h>
 #include <rex/graphics/metal/metal_shader_converter.h>
 #include <rex/graphics/metal/shader_cache.h>
+#include <rex/graphics/flags.h>
 #include <rex/ui/metal/metal_provider.h>
 #include <rex/logging.h>
 
@@ -147,7 +148,162 @@ kernel void resolve_edram_to_texture(
 
   output.write(color, gid);
 }
+
+// =======================================================
+// Render target -> EDRAM store compute kernel
+// =======================================================
+struct StoreParams {
+  uint edram_base;       // Byte offset into EDRAM buffer
+  uint edram_pitch;      // Pitch in bytes per row in EDRAM
+  uint width;            // Region width in pixels
+  uint height;           // Region height in pixels
+  uint bytes_per_pixel;  // 4 or 8
+};
+
+kernel void store_texture_to_edram(
+    texture2d<float, access::read> source [[texture(0)]],
+    device uint8_t* edram [[buffer(0)]],
+    constant StoreParams& params [[buffer(1)]],
+    uint2 gid [[thread_position_in_grid]]) {
+  if (gid.x >= params.width || gid.y >= params.height) return;
+
+  float4 color = source.read(gid);
+  uint dst_offset = params.edram_base + gid.y * params.edram_pitch +
+                    gid.x * params.bytes_per_pixel;
+
+  if (params.bytes_per_pixel == 4) {
+    uint r = uint(clamp(color.r, 0.0f, 1.0f) * 255.0f + 0.5f);
+    uint g = uint(clamp(color.g, 0.0f, 1.0f) * 255.0f + 0.5f);
+    uint b = uint(clamp(color.b, 0.0f, 1.0f) * 255.0f + 0.5f);
+    uint a = uint(clamp(color.a, 0.0f, 1.0f) * 255.0f + 0.5f);
+    uint packed = (a << 24) | (b << 16) | (g << 8) | r;
+    *reinterpret_cast<device uint*>(edram + dst_offset) = packed;
+  } else {
+    half4 h = half4(color);
+    uint2 packed;
+    packed.x = uint(as_type<ushort>(h.x)) | (uint(as_type<ushort>(h.y)) << 16);
+    packed.y = uint(as_type<ushort>(h.z)) | (uint(as_type<ushort>(h.w)) << 16);
+    *reinterpret_cast<device uint2*>(edram + dst_offset) = packed;
+  }
+}
 )";
+
+static MTLVertexFormat GetMetalVertexFormatForFetch(
+    const Shader::VertexBinding::Attribute& attr) {
+  const auto& fetch = attr.fetch_instr;
+  switch (fetch.attributes.data_format) {
+    case xenos::VertexFormat::k_8_8_8_8:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatChar4
+                                          : MTLVertexFormatUChar4;
+      }
+      return fetch.attributes.is_signed ? MTLVertexFormatChar4Normalized
+                                        : MTLVertexFormatUChar4Normalized;
+    case xenos::VertexFormat::k_16_16:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatShort2
+                                          : MTLVertexFormatUShort2;
+      }
+      return fetch.attributes.is_signed ? MTLVertexFormatShort2Normalized
+                                        : MTLVertexFormatUShort2Normalized;
+    case xenos::VertexFormat::k_16_16_16_16:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatShort4
+                                          : MTLVertexFormatUShort4;
+      }
+      return fetch.attributes.is_signed ? MTLVertexFormatShort4Normalized
+                                        : MTLVertexFormatUShort4Normalized;
+    case xenos::VertexFormat::k_16_16_FLOAT:
+      return MTLVertexFormatHalf2;
+    case xenos::VertexFormat::k_16_16_16_16_FLOAT:
+      return MTLVertexFormatHalf4;
+    case xenos::VertexFormat::k_32:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatInt
+                                          : MTLVertexFormatUInt;
+      }
+      return MTLVertexFormatFloat;
+    case xenos::VertexFormat::k_32_32:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatInt2
+                                          : MTLVertexFormatUInt2;
+      }
+      return MTLVertexFormatFloat2;
+    case xenos::VertexFormat::k_32_32_32_32:
+      if (fetch.attributes.is_integer) {
+        return fetch.attributes.is_signed ? MTLVertexFormatInt4
+                                          : MTLVertexFormatUInt4;
+      }
+      return MTLVertexFormatFloat4;
+    case xenos::VertexFormat::k_32_FLOAT:
+      return MTLVertexFormatFloat;
+    case xenos::VertexFormat::k_32_32_FLOAT:
+      return MTLVertexFormatFloat2;
+    case xenos::VertexFormat::k_32_32_32_FLOAT:
+      return MTLVertexFormatFloat3;
+    case xenos::VertexFormat::k_32_32_32_32_FLOAT:
+      return MTLVertexFormatFloat4;
+    // No direct, universally available MTL vertex format equivalent.
+    case xenos::VertexFormat::k_2_10_10_10:
+    case xenos::VertexFormat::k_10_11_11:
+    case xenos::VertexFormat::k_11_11_10:
+    default:
+      return MTLVertexFormatInvalid;
+  }
+}
+
+static bool BuildVertexDescriptorFromShaderFetch(
+    const MetalShader& shader, MTLVertexDescriptor* vd) {
+  const auto& bindings = shader.vertex_bindings();
+  if (bindings.empty()) {
+    return false;
+  }
+
+  bool has_any_attribute = false;
+  uint32_t reflection_attr_i = 0;
+  uint32_t fallback_attr_i = 0;
+  const auto& reflection = shader.reflection_info();
+
+  for (const Shader::VertexBinding& binding : bindings) {
+    if (binding.binding_index < 0 || binding.binding_index >= 31) {
+      continue;
+    }
+    const uint32_t buffer_index = static_cast<uint32_t>(binding.binding_index);
+    vd.layouts[buffer_index].stride = binding.stride_words * sizeof(uint32_t);
+    vd.layouts[buffer_index].stepRate = 1;
+    vd.layouts[buffer_index].stepFunction = MTLVertexStepFunctionPerVertex;
+
+    for (const auto& attribute : binding.attributes) {
+      uint32_t attribute_index = fallback_attr_i++;
+      if (reflection_attr_i < reflection.vertex_inputs.size()) {
+        attribute_index =
+            static_cast<uint32_t>(reflection.vertex_inputs[reflection_attr_i]
+                                      .attribute_index);
+      }
+      ++reflection_attr_i;
+
+      if (attribute_index >= 31) {
+        continue;
+      }
+      if (attribute.fetch_instr.attributes.offset < 0) {
+        continue;
+      }
+
+      MTLVertexFormat metal_format = GetMetalVertexFormatForFetch(attribute);
+      if (metal_format == MTLVertexFormatInvalid) {
+        continue;
+      }
+
+      vd.attributes[attribute_index].format = metal_format;
+      vd.attributes[attribute_index].offset =
+          static_cast<uint32_t>(attribute.fetch_instr.attributes.offset);
+      vd.attributes[attribute_index].bufferIndex = buffer_index;
+      has_any_attribute = true;
+    }
+  }
+
+  return has_any_attribute;
+}
 
 // ============================================================================
 // RenderPipelineKey
@@ -157,6 +313,9 @@ bool MetalPipelineCache::RenderPipelineKey::operator==(
     const RenderPipelineKey& o) const {
   if (vertex_shader_hash != o.vertex_shader_hash ||
       pixel_shader_hash != o.pixel_shader_hash ||
+      vertex_shader_modification != o.vertex_shader_modification ||
+      pixel_shader_modification != o.pixel_shader_modification ||
+      vertex_layout_hash != o.vertex_layout_hash ||
       depth_format != o.depth_format ||
       color_target_count != o.color_target_count ||
       sample_count != o.sample_count ||
@@ -192,6 +351,9 @@ size_t MetalPipelineCache::RenderPipelineKeyHash::operator()(
   };
   mix(key.vertex_shader_hash);
   mix(key.pixel_shader_hash);
+  mix(key.vertex_shader_modification);
+  mix(key.pixel_shader_modification);
+  mix(key.vertex_layout_hash);
   mix(key.depth_format);
   mix(key.color_target_count);
   mix(key.sample_count);
@@ -274,6 +436,16 @@ bool MetalPipelineCache::Initialize() {
   id<MTLDevice> device = provider.device();
   if (!device) return false;
 
+  shader_translator_ = std::make_unique<DxbcShaderTranslator>(
+      provider.GetAdapterVendorID(),
+      false,  // bindless_resources_used
+      false,  // edram_rov_used
+      false,  // gamma_render_target_as_srgb
+      provider.caps().supports_msaa_2x,
+      1,  // draw_resolution_scale_x
+      1,  // draw_resolution_scale_y
+      false);
+
   // Compile fallback shader library.
   NSError* error = nil;
   NSString* source = [NSString stringWithUTF8String:kFallbackShaderSource];
@@ -313,6 +485,8 @@ bool MetalPipelineCache::Initialize() {
 
   resolve_compute_func_ =
       [fallback_library_ newFunctionWithName:@"resolve_edram_to_texture"];
+  store_compute_func_ =
+      [fallback_library_ newFunctionWithName:@"store_texture_to_edram"];
 
   if (!fallback_vertex_func_ || !fallback_fragment_func_) {
     REXGPU_ERROR("MetalPipelineCache: Failed to find fallback shader functions");
@@ -322,6 +496,9 @@ bool MetalPipelineCache::Initialize() {
   if (resolve_compute_func_) {
     REXGPU_INFO("MetalPipelineCache: EDRAM resolve compute kernel available");
   }
+  if (store_compute_func_) {
+    REXGPU_INFO("MetalPipelineCache: EDRAM store compute kernel available");
+  }
 
   REXGPU_INFO("MetalPipelineCache: Initialized with fallback shaders + "
          "resolve kernel");
@@ -329,9 +506,10 @@ bool MetalPipelineCache::Initialize() {
   // Initialize the shader translation pipeline.
   // Both converters are optional — if either is unavailable, we fall back
   // to the magenta passthrough shaders (which is the current behavior).
+  bool dxbc_translator_ok = shader_translator_ != nullptr;
   bool dxbc_ok = dxbc_to_dxil_converter_.Initialize();
   bool msc_ok = metal_shader_converter_.Initialize();
-  shader_pipeline_available_ = dxbc_ok && msc_ok;
+  shader_pipeline_available_ = dxbc_translator_ok && dxbc_ok && msc_ok;
 
   if (shader_pipeline_available_) {
     // Set minimum target for Apple Silicon.
@@ -347,7 +525,8 @@ bool MetalPipelineCache::Initialize() {
            "(DXBC→DXIL→Metal IR)");
   } else {
     REXGPU_INFO("MetalPipelineCache: Shader translation pipeline NOT available "
-           "(dxilconv={}, MSC={}). Using fallback shaders.",
+           "(dxbc_translator={}, dxilconv={}, MSC={}). Using fallback shaders.",
+           dxbc_translator_ok ? "ok" : "missing",
            dxbc_ok ? "ok" : "missing", msc_ok ? "ok" : "missing");
   }
 
@@ -357,16 +536,19 @@ bool MetalPipelineCache::Initialize() {
 void MetalPipelineCache::Shutdown() {
   ClearCache();
   shader_cache_.Shutdown();
+  shader_translator_.reset();
   shader_pipeline_available_ = false;
   fallback_vertex_func_ = nil;
   fallback_fragment_func_ = nil;
   resolve_compute_func_ = nil;
+  store_compute_func_ = nil;
   fallback_library_ = nil;
 }
 
 void MetalPipelineCache::ClearCache() {
   render_pipeline_cache_.clear();
   depth_stencil_cache_.clear();
+  active_shader_modifications_.clear();
 }
 
 void MetalPipelineCache::InitializeShaderStorage(
@@ -392,11 +574,19 @@ void MetalPipelineCache::InitializeShaderStorage(
 // Shader translation
 // ============================================================================
 
-bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
+bool MetalPipelineCache::TranslateShader(MetalShader* shader,
+                                         uint64_t modification) {
   if (!shader) return false;
-  if (shader->is_valid()) return true;
+  if (shader->is_valid()) {
+    auto active_it =
+        active_shader_modifications_.find(shader->ucode_data_hash());
+    if (active_it != active_shader_modifications_.end() &&
+        active_it->second == modification) {
+      return true;
+    }
+  }
 
-  if (!shader_pipeline_available_) {
+  if (!shader_pipeline_available_ || !shader_translator_) {
     // Translation pipeline not available — use fallback shaders.
     shader->set_valid(false);
     return false;
@@ -410,10 +600,6 @@ bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
   }
 
   // Fast path: check the shader disk cache for a pre-compiled metallib.
-  // TODO: modification is hardcoded to 0. When multiple host shader variants
-  // are needed (e.g. different vertex shader types, dynamic register counts),
-  // this must use the actual modification key to avoid cache collisions.
-  uint64_t modification = 0;
   uint64_t cache_key = MetalShaderCache::GetCacheKey(
       shader->ucode_data_hash(), modification,
       static_cast<uint32_t>(shader->type()));
@@ -452,6 +638,8 @@ bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
 
         if (function) {
           shader->SetMetalLibrary(library, function);
+          active_shader_modifications_[shader->ucode_data_hash()] =
+              modification;
           REXGPU_DEBUG("MetalPipelineCache: Shader {:016X} loaded from cache",
                  shader->ucode_data_hash());
           return true;
@@ -462,18 +650,28 @@ bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
     }
   }
 
-  // Slow path: full DXBC → DXIL → Metal IR translation.
-  //
-  // The Shader base class should already have translated Xenos ucode → DXBC
-  // via the DxbcShaderTranslator. We need the DXBC binary from a Translation.
-  //
-  // Since the Shader base class manages translations via modification keys,
-  // and the pipeline cache is responsible for requesting translation,
-  // we get the DXBC data from the shader's translation.
-  auto* translation = shader->GetOrCreateTranslation(0);
-  if (!translation || !translation->is_translated()) {
-    REXGPU_DEBUG("MetalPipelineCache: Shader {:016X} not yet translated to DXBC",
-           shader->ucode_data_hash());
+  if (!shader->is_ucode_analyzed()) {
+    shader->AnalyzeUcode(ucode_disasm_buffer_);
+  }
+
+  auto* translation = static_cast<DxbcShader::DxbcTranslation*>(
+      shader->GetOrCreateTranslation(modification));
+  if (!translation) {
+    shader->set_valid(false);
+    return false;
+  }
+
+  if (!translation->is_translated()) {
+    if (!shader_translator_->TranslateAnalyzedShader(*translation)) {
+      REXGPU_DEBUG(
+          "MetalPipelineCache: Shader {:016X} DXBC translation failed "
+          "(mod={:016X})",
+          shader->ucode_data_hash(), modification);
+      shader->set_valid(false);
+      return false;
+    }
+  }
+  if (!translation->is_valid()) {
     shader->set_valid(false);
     return false;
   }
@@ -491,8 +689,11 @@ bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
       device, dxbc_data, dxbc_to_dxil_converter_, metal_shader_converter_);
 
   if (success) {
-    REXGPU_DEBUG("MetalPipelineCache: Shader {:016X} translated successfully",
-           shader->ucode_data_hash());
+    active_shader_modifications_[shader->ucode_data_hash()] = modification;
+    REXGPU_DEBUG(
+        "MetalPipelineCache: Shader {:016X} translated successfully "
+        "(mod={:016X})",
+        shader->ucode_data_hash(), modification);
     // Store the compiled metallib to disk cache.
     if (shader_cache_.IsInitialized()) {
       shader_cache_.Store(cache_key, shader->metal_function_name(),
@@ -503,9 +704,10 @@ bool MetalPipelineCache::TranslateShader(MetalShader* shader) {
     // are now live, and the data has been persisted to the disk cache.
     shader->ClearIntermediateData();
   } else {
-    REXGPU_DEBUG("MetalPipelineCache: Shader {:016X} translation failed — "
-           "using fallback",
-           shader->ucode_data_hash());
+    REXGPU_DEBUG(
+        "MetalPipelineCache: Shader {:016X} translation failed — "
+        "using fallback (mod={:016X})",
+        shader->ucode_data_hash(), modification);
     shader->set_valid(false);
   }
 
@@ -559,35 +761,36 @@ id<MTLRenderPipelineState> MetalPipelineCache::GetOrCreateRenderPipelineState(
   desc.vertexFunction = vs_func;
   desc.fragmentFunction = fs_func;
 
-  // Vertex descriptor for the fallback shader.
-  // Matches FallbackVertexIn: position(float4), color(float4), texcoord(float2)
-  // TODO: When translated shaders are active, the vertex descriptor must be
-  // derived from the shader's Xenos vertex fetch instructions instead of this
-  // hardcoded layout. This fixed layout is only correct for the fallback path.
   MTLVertexDescriptor* vd = [[MTLVertexDescriptor alloc] init];
 
-  // Position: float4 at offset 0 (from guest vertex data or generated).
-  vd.attributes[0].format = MTLVertexFormatFloat4;
-  vd.attributes[0].offset = 0;
-  vd.attributes[0].bufferIndex = 0;
-  // Color: float4 at offset 16.
-  vd.attributes[1].format = MTLVertexFormatFloat4;
-  vd.attributes[1].offset = 16;
-  vd.attributes[1].bufferIndex = 0;
-  // Texcoord: float2 at offset 32.
-  vd.attributes[2].format = MTLVertexFormatFloat2;
-  vd.attributes[2].offset = 32;
-  vd.attributes[2].bufferIndex = 0;
-  // Stride: 40 bytes (float4 + float4 + float2).
-  vd.layouts[0].stride = 40;
-  vd.layouts[0].stepRate = 1;
-  vd.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+  bool used_fetch_layout = false;
+  if (REXCVAR_GET(metal_vertex_layout_from_fetch) &&
+      vertex_shader && vertex_shader->is_valid()) {
+    used_fetch_layout = BuildVertexDescriptorFromShaderFetch(*vertex_shader, vd);
+  }
+
+  if (!used_fetch_layout) {
+    // Vertex descriptor for the fallback shader.
+    // Matches FallbackVertexIn: position(float4), color(float4), texcoord(float2)
+    vd.attributes[0].format = MTLVertexFormatFloat4;
+    vd.attributes[0].offset = 0;
+    vd.attributes[0].bufferIndex = 0;
+    vd.attributes[1].format = MTLVertexFormatFloat4;
+    vd.attributes[1].offset = 16;
+    vd.attributes[1].bufferIndex = 0;
+    vd.attributes[2].format = MTLVertexFormatFloat2;
+    vd.attributes[2].offset = 32;
+    vd.attributes[2].bufferIndex = 0;
+    vd.layouts[0].stride = 40;
+    vd.layouts[0].stepRate = 1;
+    vd.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+  }
 
   desc.vertexDescriptor = vd;
 
   // Color attachments.
   for (uint32_t i = 0; i < key.color_target_count && i < 4; ++i) {
-    auto& ca = desc.colorAttachments[i];
+    auto ca = desc.colorAttachments[i];
     ca.pixelFormat = (MTLPixelFormat)key.color_formats[i];
 
     const auto& bs = key.blend_states[i];

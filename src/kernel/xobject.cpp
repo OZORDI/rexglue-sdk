@@ -13,6 +13,10 @@
 
 #include <vector>
 
+namespace rex::kernel {
+std::atomic<bool> g_headless_wait_cap_enabled{true};
+}  // namespace rex::kernel
+
 #include <rex/stream.h>
 #include <rex/time/clock.h>
 #include <rex/kernel/kernel_state.h>
@@ -210,10 +214,12 @@ X_STATUS XObject::Wait(uint32_t wait_reason, uint32_t processor_mode,
   // In headless mode, GPU/audio/input subsystems don't exist, so events they
   // would normally signal are never signaled. Cap infinite waits to 100ms to
   // allow threads to make forward progress via X_STATUS_TIMEOUT.
-  constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
-  bool was_infinite = (timeout_ms == std::chrono::milliseconds::max());
-  if (was_infinite) {
-    timeout_ms = kHeadlessMaxWait;
+  // Consumers with real GPU/audio disable this once rendering starts.
+  if (g_headless_wait_cap_enabled.load(std::memory_order_relaxed)) {
+    constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
+    if (timeout_ms == std::chrono::milliseconds::max()) {
+      timeout_ms = kHeadlessMaxWait;
+    }
   }
 #endif
 
@@ -245,9 +251,11 @@ X_STATUS XObject::SignalAndWait(XObject* signal_object, XObject* wait_object,
                   : std::chrono::milliseconds::max();
 
 #if defined(REX_HEADLESS)
-  constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
-  if (timeout_ms == std::chrono::milliseconds::max()) {
-    timeout_ms = kHeadlessMaxWait;
+  if (g_headless_wait_cap_enabled.load(std::memory_order_relaxed)) {
+    constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
+    if (timeout_ms == std::chrono::milliseconds::max()) {
+      timeout_ms = kHeadlessMaxWait;
+    }
   }
 #endif
 
@@ -287,9 +295,11 @@ X_STATUS XObject::WaitMultiple(uint32_t count, XObject** objects,
                   : std::chrono::milliseconds::max();
 
 #if defined(REX_HEADLESS)
-  constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
-  if (timeout_ms == std::chrono::milliseconds::max()) {
-    timeout_ms = kHeadlessMaxWait;
+  if (g_headless_wait_cap_enabled.load(std::memory_order_relaxed)) {
+    constexpr auto kHeadlessMaxWait = std::chrono::milliseconds(100);
+    if (timeout_ms == std::chrono::milliseconds::max()) {
+      timeout_ms = kHeadlessMaxWait;
+    }
   }
 #endif
 

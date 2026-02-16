@@ -113,12 +113,26 @@ using PPCFunc = void(PPCContext& ctx, uint8_t* base);
 // Requires ppc_config.h to be included first.
 
 #ifdef PPC_CONFIG_H_INCLUDED
-// Function table lookup: indexed by (addr - CODE_BASE)
+// Raw function table lookup (no bounds check). Usable as lvalue for writes.
+#undef PPC_LOOKUP_FUNC_RAW
+#define PPC_LOOKUP_FUNC_RAW(x, y) (*(PPCFunc**)(x + PPC_IMAGE_BASE + PPC_IMAGE_SIZE + (uint64_t(uint32_t(y) - PPC_CODE_BASE) * 2)))
+
+// Bounds-checked function table lookup: returns nullptr for addresses outside
+// the code section to prevent out-of-bounds memory access from corrupted
+// vtables or function pointers.
 #undef PPC_LOOKUP_FUNC
-#define PPC_LOOKUP_FUNC(x, y) (*(PPCFunc**)(x + PPC_IMAGE_BASE + PPC_IMAGE_SIZE + (uint64_t(uint32_t(y) - PPC_CODE_BASE) * 2)))
+#define PPC_LOOKUP_FUNC(x, y) \
+    ((uint32_t(y) >= PPC_CODE_BASE && uint32_t(y) < (PPC_CODE_BASE + PPC_CODE_SIZE)) \
+        ? PPC_LOOKUP_FUNC_RAW(x, y) \
+        : (PPCFunc*)nullptr)
 
 #undef PPC_CALL_INDIRECT_FUNC
-#define PPC_CALL_INDIRECT_FUNC(x) PPC_LOOKUP_FUNC(base, x)(ctx, base);
+#define PPC_CALL_INDIRECT_FUNC(x) \
+    do { \
+        PPCFunc* _fn = PPC_LOOKUP_FUNC(base, x); \
+        if (_fn) { _fn(ctx, base); } \
+        else { ctx.r3.u64 = 0; } \
+    } while(0);
 
 #endif // PPC_CONFIG_H_INCLUDED
 
@@ -483,3 +497,8 @@ inline std::atomic<int32_t>& ppc_global_lock_count_() {
         assert(old_count_ >= 1 && "LeaveGlobalLock called without matching EnterGlobalLock"); \
         rex::thread::global_critical_region::mutex().unlock(); \
     } while(0)
+
+// Thread-local PPC context pointer.
+// Set by XThread::Execute() so that host-side hooks (e.g. RtlEnterCriticalSection)
+// can access the current thread's register state via g_ppcContext->r13 etc.
+inline thread_local PPCContext* g_ppcContext = nullptr;

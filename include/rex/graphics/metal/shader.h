@@ -15,7 +15,8 @@
 #include <string>
 #include <vector>
 
-#include <rex/graphics/pipeline/shader/shader.h>
+#include <rex/graphics/pipeline/shader/dxbc.h>
+#include <rex/graphics/metal/metal_shader_converter.h>
 
 #ifdef __OBJC__
 @protocol MTLLibrary;
@@ -28,7 +29,7 @@ namespace rex::graphics::metal {
 class DxbcToDxilConverter;
 class MetalShaderConverter;
 
-class MetalShader : public Shader {
+class MetalShader : public DxbcShader {
  public:
   MetalShader(xenos::ShaderType shader_type, uint64_t ucode_data_hash,
               const uint32_t* ucode_dwords, size_t ucode_dword_count);
@@ -65,6 +66,9 @@ class MetalShader : public Shader {
   const std::string& metal_function_name() const {
     return metal_function_name_;
   }
+  const MetalShaderReflectionInfo& reflection_info() const {
+    return reflection_info_;
+  }
 
   // Release intermediate DXIL and metallib data to free memory.
   // Call after the shader has been successfully translated and cached.
@@ -88,6 +92,7 @@ class MetalShader : public Shader {
   std::vector<uint8_t> dxil_data_;
   std::vector<uint8_t> metallib_data_;
   std::string metal_function_name_;
+  MetalShaderReflectionInfo reflection_info_;
 };
 
 }  // namespace rex::graphics::metal

@@ -89,6 +89,13 @@ class Runtime {
   const std::filesystem::path& storage_root() const { return storage_root_; }
   const std::filesystem::path& content_root() const { return content_root_; }
 
+  // Inject a pre-existing Memory system (call before Setup).
+  // If set, Setup() will skip creating its own Memory.
+  void set_memory(std::unique_ptr<memory::Memory> mem) { memory_ = std::move(mem); }
+
+  // Set the global instance pointer (normally set by the code_base overload of Setup).
+  void set_instance() { instance_ = this; }
+
   // Set the app context for presentation (call before Setup)
   void set_app_context(ui::WindowedAppContext* context) { app_context_ = context; }
   ui::WindowedAppContext* app_context() const { return app_context_; }

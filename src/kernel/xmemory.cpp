@@ -150,7 +150,15 @@ bool Memory::Initialize() {
   // Attempt to create our views. This may fail at the first address
   // we pick, so try a few times.
   mapping_base_ = 0;
-  for (size_t n = 32; n < 64; n++) {
+#if REX_PLATFORM_MAC && REX_ARCH_ARM64
+  // On ARM64 macOS, the dyld shared cache occupies ~0x180000000-0x2C0000000.
+  // Starting at 4GB or 8GB would overlap and unmap system library pages,
+  // causing SIGSEGV in CoreText/MoltenVK/etc. Start at 16GB (1<<34) to clear it.
+  constexpr size_t kMapSearchStart = 34;
+#else
+  constexpr size_t kMapSearchStart = 32;
+#endif
+  for (size_t n = kMapSearchStart; n < 64; n++) {
     auto mapping_base = reinterpret_cast<uint8_t*>(1ull << n);
     if (!MapViews(mapping_base)) {
       mapping_base_ = mapping_base;

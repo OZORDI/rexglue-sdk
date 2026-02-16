@@ -14,6 +14,7 @@
 #include <rex/ui/metal/metal_provider.h>
 #include <rex/kernel.h>
 #include <rex/logging.h>
+#include <rex/xenia_logging_compat.h>
 
 namespace rex::graphics::metal {
 
@@ -26,6 +27,11 @@ bool MetalGraphicsSystem::IsAvailable() {
 }
 
 std::string MetalGraphicsSystem::name() const {
+  auto metal_command_processor =
+      static_cast<MetalCommandProcessor*>(command_processor());
+  if (metal_command_processor != nullptr) {
+    return metal_command_processor->GetWindowTitleText();
+  }
   return "Metal";
 }
 

@@ -209,6 +209,9 @@ class MetalCommandProcessor : public CommandProcessor {
   uint32_t current_rt_color_bases_[4] = {};
   uint32_t current_rt_width_ = 0;
   uint32_t current_rt_height_ = 0;
+  MetalRenderTargetCache::RenderTarget current_rt_colors_[4] = {};
+  MetalRenderTargetCache::RenderTarget current_rt_depth_ = {};
+  bool current_rt_depth_enabled_ = false;
 
   // GPU sub-systems.
   std::unique_ptr<MetalSharedMemory> shared_memory_;

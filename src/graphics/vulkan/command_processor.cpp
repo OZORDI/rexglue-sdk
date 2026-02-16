@@ -1243,15 +1243,31 @@ void VulkanCommandProcessor::IssueSwap(uint32_t frontbuffer_ptr,
                                        uint32_t frontbuffer_height) {
   SCOPE_profile_cpu_f("gpu");
 
+  static int issue_swap_log_count = 0;
+  bool log_issue_swap = issue_swap_log_count < 32;
+
   ui::Presenter* presenter = graphics_system_->presenter();
+  if (log_issue_swap) {
+    REXGPU_INFO(
+        "IssueSwap[{}] entry: frontbuffer={:08X} width={} height={} presenter={:p}",
+        issue_swap_log_count, frontbuffer_ptr, frontbuffer_width,
+        frontbuffer_height, static_cast<void*>(presenter));
+  }
   if (!presenter) {
-    REXGPU_ERROR("XELOG_GPU PRESENT: NO PRESENTER");
+    if (log_issue_swap) {
+      REXGPU_WARN("IssueSwap[{}] abort: presenter is null", issue_swap_log_count);
+      issue_swap_log_count++;
+    }
     return;
   }
 
   // In case the swap command is the only one in the frame.
   if (!BeginSubmission(true)) {
-    REXGPU_ERROR("XELOG_GPU PRESENT: BeginSubmission FAILED");
+    if (log_issue_swap) {
+      REXGPU_WARN("IssueSwap[{}] abort: BeginSubmission failed",
+                  issue_swap_log_count);
+      issue_swap_log_count++;
+    }
     return;
   }
 
@@ -1262,20 +1278,47 @@ void VulkanCommandProcessor::IssueSwap(uint32_t frontbuffer_ptr,
   VkImageView swap_texture_view = texture_cache_->RequestSwapTexture(
       frontbuffer_width_scaled, frontbuffer_height_scaled, frontbuffer_format);
   if (swap_texture_view == VK_NULL_HANDLE) {
-    REXGPU_ERROR("XELOG_GPU PRESENT: swap_texture_view=NULL");
+    if (log_issue_swap) {
+      REXGPU_WARN(
+          "IssueSwap[{}] abort: RequestSwapTexture returned null (scaled={}x{} "
+          "format={})",
+          issue_swap_log_count, frontbuffer_width_scaled,
+          frontbuffer_height_scaled, static_cast<uint32_t>(frontbuffer_format));
+      issue_swap_log_count++;
+    }
     return;
   }
   REXGPU_DEBUG("XELOG_GPU PRESENT: swap_texture_view={:p} scaled_size={}x{} format={}",
          static_cast<void*>(swap_texture_view), frontbuffer_width_scaled,
          frontbuffer_height_scaled, static_cast<uint32_t>(frontbuffer_format));
 
-  presenter->RefreshGuestOutput(
+  if (log_issue_swap) {
+    REXGPU_INFO(
+        "IssueSwap[{}] refresh request: scaled={}x{} format={} view={:p}",
+        issue_swap_log_count, frontbuffer_width_scaled,
+        frontbuffer_height_scaled, static_cast<uint32_t>(frontbuffer_format),
+        static_cast<void*>(swap_texture_view));
+  }
+
+  bool refresh_result = presenter->RefreshGuestOutput(
       frontbuffer_width_scaled, frontbuffer_height_scaled, 1280, 720,
       [this, frontbuffer_width_scaled, frontbuffer_height_scaled,
        frontbuffer_format, swap_texture_view](
           ui::Presenter::GuestOutputRefreshContext& context) -> bool {
+        static int issue_swap_refresh_log_count = 0;
+        bool log_issue_swap_refresh = issue_swap_refresh_log_count < 32;
+        if (log_issue_swap_refresh) {
+          REXGPU_INFO("IssueSwapRefresh[{}] callback begin",
+                      issue_swap_refresh_log_count);
+        }
+
         // In case the swap command is the only one in the frame.
         if (!BeginSubmission(true)) {
+          if (log_issue_swap_refresh) {
+            REXGPU_WARN("IssueSwapRefresh[{}] abort: BeginSubmission failed",
+                        issue_swap_refresh_log_count);
+            issue_swap_refresh_log_count++;
+          }
           return false;
         }
 
@@ -1291,6 +1334,15 @@ void VulkanCommandProcessor::IssueSwap(uint32_t frontbuffer_ptr,
 
         uint32_t swap_frame_index =
             uint32_t(frame_current_ % kMaxFramesInFlight);
+
+        if (log_issue_swap_refresh) {
+          REXGPU_INFO(
+              "IssueSwapRefresh[{}] image_version={} frame_index={} scaled={}x{} "
+              "format={}",
+              issue_swap_refresh_log_count, guest_output_image_version,
+              swap_frame_index, frontbuffer_width_scaled,
+              frontbuffer_height_scaled, static_cast<uint32_t>(frontbuffer_format));
+        }
 
         // This is according to D3D::InitializePresentationParameters from a
         // game executable, which initializes the 256-entry table gamma ramp for
@@ -1573,8 +1625,19 @@ void VulkanCommandProcessor::IssueSwap(uint32_t frontbuffer_ptr,
         // presenter so it can submit its own commands for displaying it to the
         // queue, and also need to submit the release barrier.
         EndSubmission(true);
+        if (log_issue_swap_refresh) {
+          REXGPU_INFO("IssueSwapRefresh[{}] callback success",
+                      issue_swap_refresh_log_count);
+          issue_swap_refresh_log_count++;
+        }
         return true;
       });
+
+  if (log_issue_swap) {
+    REXGPU_INFO("IssueSwap[{}] RefreshGuestOutput result={}",
+                issue_swap_log_count, refresh_result);
+    issue_swap_log_count++;
+  }
 
   // End the frame even if did not present for any reason (the image refresher
   // was not called), to prevent leaking per-frame resources.

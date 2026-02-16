@@ -11,7 +11,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -38,6 +40,19 @@ class MetalPrimitiveProcessor : public PrimitiveProcessor {
   bool Initialize();
   void Shutdown(bool from_destructor = false);
 
+#ifdef __OBJC__
+  id<MTLBuffer> GetBuiltinIndexBuffer(size_t handle,
+                                      uint64_t& offset_bytes_out) const;
+  id<MTLBuffer> GetConvertedIndexBuffer(size_t handle,
+                                        uint64_t& offset_bytes_out,
+                                        uint64_t* size_bytes_out = nullptr) const;
+#else
+  void* GetBuiltinIndexBuffer(size_t handle, uint64_t& offset_bytes_out) const;
+  void* GetConvertedIndexBuffer(size_t handle,
+                                uint64_t& offset_bytes_out,
+                                uint64_t* size_bytes_out = nullptr) const;
+#endif
+
   void CompletedSubmissionUpdated();
   void BeginSubmission();
   void BeginFrame();
@@ -63,8 +78,46 @@ class MetalPrimitiveProcessor : public PrimitiveProcessor {
       const void* index_data, uint32_t index_count,
       xenos::IndexFormat index_format, xenos::Endian endian);
 
+ protected:
+  bool InitializeBuiltinIndexBuffer(
+      size_t size_bytes, std::function<void(void*)> fill_callback) override;
+  void* RequestHostConvertedIndexBufferForCurrentFrame(
+      xenos::IndexFormat format, uint32_t index_count, bool coalign_for_simd,
+      uint32_t coalignment_original_address,
+      size_t& backend_handle_out) override;
+
  private:
   MetalCommandProcessor& command_processor_;
+
+  struct ConvertedIndexBufferBinding {
+#ifdef __OBJC__
+    id<MTLBuffer> buffer = nil;
+#else
+    void* buffer = nullptr;
+#endif
+    uint64_t offset_bytes = 0;
+    uint64_t size_bytes = 0;
+  };
+  std::vector<ConvertedIndexBufferBinding> converted_index_buffers_;
+  uint64_t current_frame_ = 0;
+
+#ifdef __OBJC__
+  id<MTLBuffer> builtin_index_buffer_ = nil;
+#else
+  void* builtin_index_buffer_ = nullptr;
+#endif
+  size_t builtin_index_buffer_size_ = 0;
+
+  struct FrameIndexBuffer {
+#ifdef __OBJC__
+    id<MTLBuffer> buffer = nil;
+#else
+    void* buffer = nullptr;
+#endif
+    size_t size = 0;
+    uint64_t last_frame_used = 0;
+  };
+  std::vector<FrameIndexBuffer> frame_index_buffers_;
 };
 
 }  // namespace rex::graphics::metal

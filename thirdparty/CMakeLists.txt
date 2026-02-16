@@ -239,6 +239,13 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
         ${FFMPEG_DIR}/libavutil/x86/imgutils_init.c
         ${FFMPEG_DIR}/libavutil/x86/lls_init.c
     )
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    # cpu.c (plain C) + no-op stubs for NEON init functions.
+    # The NEON .S files use ELF section directives incompatible with macOS Mach-O.
+    target_sources(libavutil PRIVATE
+        ${FFMPEG_DIR}/libavutil/aarch64/cpu.c
+        ${FFMPEG_DIR}/libavutil/aarch64/float_dsp_init_noop.c
+    )
 endif()
 
 target_include_directories(libavutil
@@ -251,6 +258,9 @@ target_compile_definitions(libavutil PRIVATE ${FFMPEG_COMMON_DEFINES})
 target_compile_options(libavutil PRIVATE -w)  # Suppress warnings in third-party code
 if(WIN32)
     target_link_libraries(libavutil PRIVATE bcrypt)
+endif()
+if(APPLE)
+    target_link_libraries(libavutil PUBLIC "-liconv")
 endif()
 
 # libavcodec - FFmpeg codec library (depends on libavutil)
@@ -327,6 +337,11 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
         ${FFMPEG_DIR}/libavcodec/x86/fft_init.c
         ${FFMPEG_DIR}/libavcodec/x86/idctdsp_init.c
         ${FFMPEG_DIR}/libavcodec/x86/fdct.c
+    )
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    # No-op stub for fft_init_aarch64 (NEON .S incompatible with Mach-O).
+    target_sources(libavcodec PRIVATE
+        ${FFMPEG_DIR}/libavcodec/aarch64/fft_init_noop.c
     )
 endif()
 

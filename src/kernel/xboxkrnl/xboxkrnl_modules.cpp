@@ -37,8 +37,18 @@ dword_result_t XexCheckExecutablePrivilege_entry(dword_t privilege) {
 
   uint32_t flags = 0;
   module->GetOptHeader<uint32_t>(XEX_HEADER_SYSTEM_FLAGS, &flags);
+  uint32_t has_privilege = (flags & mask) > 0;
 
-  return (flags & mask) > 0;
+  static int privilege_log_count = 0;
+  if (privilege_log_count < 16) {
+    REXKRNL_INFO(
+        "XexCheckExecutablePrivilege[{}]: priv={} flags={:08X} mask={:08X} -> {}",
+        privilege_log_count, static_cast<uint32_t>(privilege), flags, mask,
+        has_privilege);
+    privilege_log_count++;
+  }
+
+  return has_privilege;
 }
 
 dword_result_t XexGetModuleHandle_entry(lpstring_t module_name,

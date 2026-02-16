@@ -27,7 +27,7 @@ class MetalCommandProcessor;
 class MetalSharedMemory : public SharedMemory {
  public:
   MetalSharedMemory(MetalCommandProcessor& command_processor,
-                    memory::Memory& memory, TraceWriter& trace_writer);
+                    memory::Memory& memory);
   ~MetalSharedMemory() override;
 
   bool Initialize();
@@ -65,6 +65,9 @@ class MetalSharedMemory : public SharedMemory {
  protected:
   bool AllocateSparseHostGpuMemoryRange(uint32_t offset_allocations,
                                         uint32_t length_allocations) override;
+  bool UploadRanges(
+      const std::vector<std::pair<uint32_t, uint32_t>>&
+          upload_page_ranges) override;
 
  private:
   MetalCommandProcessor& command_processor_;

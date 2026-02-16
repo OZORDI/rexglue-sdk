@@ -83,5 +83,9 @@ REXCVAR_DECLARE(std::string, gpu);
 // Metal specific (macOS)
 REXCVAR_DECLARE(bool, metal_validation_enabled);
 REXCVAR_DECLARE(int32_t, metal_gpu_family_override);
+REXCVAR_DECLARE(bool, metal_vertex_layout_from_fetch);
+REXCVAR_DECLARE(bool, metal_rectlist_vs_expand);
+REXCVAR_DECLARE(bool, metal_rectlist_vs_expand_strict);
+REXCVAR_DECLARE(bool, metal_edram_store_on_renderpass_end);
 
 #define XE_GPU_FINE_GRAINED_DRAW_SCOPES 1

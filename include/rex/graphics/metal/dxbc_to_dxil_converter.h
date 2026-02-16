@@ -58,6 +58,11 @@ class DxbcToDxilConverter {
                                           void** instance);
   DxcCreateInstanceFn create_instance_fn_ = nullptr;
 
+  // REFIID representation accepted by the loaded dxilconv build.
+  // Some macOS builds use WinAdapter emulated __uuidof tokens instead of
+  // GUID pointers for interface selection.
+  const void* converter_iid_ = nullptr;
+
   // Per-thread converter instance management.
   void* GetThreadConverter(std::string* error_message);
 

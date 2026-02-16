@@ -31,6 +31,12 @@ class ByteStream;
 
 namespace rex::kernel {
 
+// When true, XObject::Wait/SignalAndWait/WaitMultiple cap infinite waits to
+// 100ms under REX_HEADLESS to prevent deadlocks during boot/init when GPU/audio
+// subsystems aren't signaling events yet.  Consumers with real GPU/audio (e.g.
+// LibertyRecomp) should set this to false once rendering starts.
+extern std::atomic<bool> g_headless_wait_cap_enabled;
+
 constexpr memory::fourcc_t kXObjSignature = memory::make_fourcc('R', 'E', 'X', '\0');
 
 class KernelState;

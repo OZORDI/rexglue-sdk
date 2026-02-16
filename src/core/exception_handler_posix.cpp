@@ -482,9 +482,34 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
     }
   }
 
-  // No handler handled the exception. If we simply return, the kernel will
-  // re-execute the faulting instruction, causing an infinite signal loop.
-  // Restore the original signal handler and re-raise to get a proper crash.
+  // No handler handled the exception.
+  // On macOS, some system library faults (CoreText, etc.) appear as SIGSEGV
+  // but are resolved by the Mach VM on the next attempt. We return with our
+  // handler still installed — the kernel re-executes the instruction, the VM
+  // maps the page, and execution continues. A per-address retry counter
+  // prevents infinite loops for truly fatal faults.
+#if REX_PLATFORM_MAC
+  {
+    static thread_local uint64_t last_fault_addr = 0;
+    static thread_local int fault_retry_count = 0;
+    uint64_t addr = reinterpret_cast<uint64_t>(signal_info->si_addr);
+    if (addr == last_fault_addr) {
+      ++fault_retry_count;
+    } else {
+      last_fault_addr = addr;
+      fault_retry_count = 1;
+    }
+    if (fault_retry_count <= 4) {
+      // Let the Mach VM resolve this fault — just return with our handler
+      // still installed. The kernel will re-execute the faulting instruction.
+      return;
+    }
+    // Exceeded retry limit — this is a truly fatal fault.
+    last_fault_addr = 0;
+    fault_retry_count = 0;
+  }
+#endif
+  // Fatal: restore the original handler and re-raise.
   switch (signal_number) {
     case SIGILL:
       sigaction(SIGILL, &original_sigill_handler_, nullptr);
@@ -498,7 +523,6 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
       break;
 #endif
   }
-  // Log before crashing (signal-safe)
   ss_write("[FATAL] Unhandled ");
   ss_write(signal_number == SIGSEGV ? "SIGSEGV" :
            signal_number == SIGBUS  ? "SIGBUS"  :
@@ -506,8 +530,26 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
   ss_write(" at addr=");
   ss_hex(reinterpret_cast<uint64_t>(signal_info->si_addr));
   ss_write("\n");
-  // Re-raise with default handler to get a proper crash
   raise(signal_number);
+}
+
+void ExceptionHandler::ReinstallSignalHandlers() {
+  // Force re-registration of ExceptionHandlerCallback as the active POSIX
+  // signal handler.  Call this after another subsystem (e.g. SEH/guest)
+  // has installed its own handler on top.  The previous (SEH) handler is
+  // saved in original_sig*_handler_ so ExceptionHandlerCallback can fall
+  // back to it for faults it doesn't handle.
+  struct sigaction sa;
+  std::memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = ExceptionHandlerCallback;
+  sa.sa_flags = SA_SIGINFO;
+
+  sigaction(SIGILL,  &sa, &original_sigill_handler_);
+  sigaction(SIGSEGV, &sa, &original_sigsegv_handler_);
+#if REX_PLATFORM_MAC
+  sigaction(SIGBUS,  &sa, &original_sigbus_handler_);
+#endif
+  signal_handlers_installed_ = true;
 }
 
 void ExceptionHandler::Install(Handler fn, void* data) {

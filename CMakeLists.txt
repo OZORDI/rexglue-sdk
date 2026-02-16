@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(ReXGlue
     VERSION 0.1.0
-    LANGUAGES C CXX
+    LANGUAGES C CXX ASM
     DESCRIPTION "Xbox 360 Recompilation SDK"
 )
 
@@ -172,6 +172,12 @@ if(REXGLUE_BUILD_GTA4)
     add_subdirectory(gta4-recomp)
 endif()
 
+# Sample recompilation project (opt-in)
+option(REXGLUE_BUILD_SAMPLE "Build sample recomp project" OFF)
+if(REXGLUE_BUILD_SAMPLE)
+    add_subdirectory(sample-recomp)
+endif()
+
 # Print configuration summary
 message(STATUS "===========================================")
 message(STATUS "ReXGlue Configuration Summary:")
@@ -211,7 +217,7 @@ install(TARGETS
     disruptorplus renderdoc simde tomlplusplus  # INTERFACE (header-only)
     aes128 mspack disasm xxhash    # STATIC libraries
     libavcodec libavutil           # FFmpeg (vendored build)
-    SPIRV glslang MachineIndependent GenericCodeGen  # glslang (vendored build)
+    SPIRV glslang MachineIndependent GenericCodeGen OSDependent  # glslang (vendored build)
     # CLI tool
     rexglue
     EXPORT rexglueTargets

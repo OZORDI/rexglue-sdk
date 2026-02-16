@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
@@ -76,6 +77,12 @@ static const GUID kIidDxbcConverter = {
     0x550d,
     0x4f09,
     {0x89, 0xd9, 0x7a, 0x1a, 0x4a, 0x76, 0x2f, 0x2d}};
+
+// WinAdapter emulated __uuidof tokens used by some macOS dxilconv builds.
+// These are compared as opaque REFIID values (pointer identity), not dereferenced
+// as GUIDs in that mode.
+static constexpr uintptr_t kIidTokenIUnknown = 0x0C52523E;
+static constexpr uintptr_t kIidTokenINoMarshal = 0x038D7B3C;
 
 // Default extra options passed to the converter.
 static const wchar_t kDefaultExtraOptions[] = L"-skip-container-parts";
@@ -167,13 +174,39 @@ bool DxbcToDxilConverter::Initialize() {
   }
 
   // Test that we can create a converter instance.
+  // Different dxilconv macOS builds may expect REFIID either as:
+  // 1) A GUID pointer (standard COM style), or
+  // 2) A WinAdapter emulated __uuidof token (opaque integer-as-pointer).
+  struct IidCandidate {
+    const char* name;
+    const void* value;
+  };
+  const IidCandidate iid_candidates[] = {
+      {"GUID(IDxbcConverter)", &kIidDxbcConverter},
+      {"WinAdapterToken(IUnknown)",
+       reinterpret_cast<const void*>(kIidTokenIUnknown)},
+      {"WinAdapterToken(INoMarshal)",
+       reinterpret_cast<const void*>(kIidTokenINoMarshal)},
+  };
+
   IDxbcConverterObj* test_converter = nullptr;
-  HRESULT hr = create_instance_fn_(&kClsidDxbcConverter, &kIidDxbcConverter,
-                                   reinterpret_cast<void**>(&test_converter));
-  if (hr != S_OK || !test_converter) {
+  HRESULT hr = 0;
+  const char* selected_iid_mode = "<none>";
+  for (const IidCandidate& iid_candidate : iid_candidates) {
+    test_converter = nullptr;
+    hr = create_instance_fn_(&kClsidDxbcConverter, iid_candidate.value,
+                             reinterpret_cast<void**>(&test_converter));
+    if (hr == S_OK && test_converter) {
+      converter_iid_ = iid_candidate.value;
+      selected_iid_mode = iid_candidate.name;
+      break;
+    }
+  }
+
+  if (!converter_iid_ || !test_converter) {
     REXGPU_ERROR(
         "DxbcToDxilConverter: Failed to create test IDxbcConverter "
-        "(hr=0x{:08X})",
+        "with any known IID mode (last hr=0x{:08X})",
         static_cast<unsigned>(hr));
     dlclose(dxilconv_lib_);
     dxilconv_lib_ = nullptr;
@@ -188,13 +221,14 @@ bool DxbcToDxilConverter::Initialize() {
   // or return an unexpected result, catching ABI mismatches early.
   void* qi_result = nullptr;
   HRESULT qi_hr = test_converter->vtbl->QueryInterface(
-      test_converter, &kIidDxbcConverter, &qi_result);
+      test_converter, reinterpret_cast<const GUID*>(converter_iid_),
+      &qi_result);
   if (qi_hr != S_OK || qi_result == nullptr) {
     REXGPU_ERROR(
         "DxbcToDxilConverter: COM vtable ABI verification failed "
-        "(QueryInterface returned hr=0x{:08X}, ptr={}). "
+        "(iid_mode={}, QueryInterface returned hr=0x{:08X}, ptr={}). "
         "The IDxbcConverterVtbl layout may not match the library.",
-        static_cast<unsigned>(qi_hr), qi_result);
+        selected_iid_mode, static_cast<unsigned>(qi_hr), qi_result);
     test_converter->vtbl->Release(test_converter);
     dlclose(dxilconv_lib_);
     dxilconv_lib_ = nullptr;
@@ -205,6 +239,8 @@ bool DxbcToDxilConverter::Initialize() {
   static_cast<IDxbcConverterObj*>(qi_result)->vtbl->Release(
       static_cast<IDxbcConverterObj*>(qi_result));
   test_converter->vtbl->Release(test_converter);
+
+  REXGPU_INFO("DxbcToDxilConverter: Using IID mode {}", selected_iid_mode);
 
   // Check for env var override of extra options (matches reference
   // code's XENIA_DXBC2DXIL_FLAGS pattern).
@@ -231,15 +267,15 @@ void* DxbcToDxilConverter::GetThreadConverter(std::string* error_message) {
     return thread_state.converter;
   }
 
-  if (!create_instance_fn_) {
+  if (!create_instance_fn_ || !converter_iid_) {
     if (error_message) {
-      *error_message = "DxcCreateInstance not available";
+      *error_message = "DxcCreateInstance not available or IID mode unresolved";
     }
     return nullptr;
   }
 
   HRESULT hr = create_instance_fn_(
-      &kClsidDxbcConverter, &kIidDxbcConverter,
+      &kClsidDxbcConverter, converter_iid_,
       reinterpret_cast<void**>(&thread_state.converter));
   if (hr != S_OK || !thread_state.converter) {
     if (error_message) {

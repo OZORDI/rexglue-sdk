@@ -39,6 +39,21 @@ class MetalTextureCache : public TextureCache {
   void Shutdown(bool from_destructor = false);
 
   void ClearCache() override;
+
+  // Pure virtual overrides from TextureCache
+  uint32_t GetHostFormatSwizzle(TextureKey key) const override { return 0; }
+  uint32_t GetMaxHostTextureWidthHeight(
+      xenos::DataDimension dimension) const override { return 16384; }
+  uint32_t GetMaxHostTextureDepthOrArraySize(
+      xenos::DataDimension dimension) const override { return 2048; }
+  std::unique_ptr<Texture> CreateTexture(TextureKey key) override {
+    return nullptr;
+  }
+  bool LoadTextureDataFromResidentMemoryImpl(Texture& texture,
+                                             bool load_base,
+                                             bool load_mips) override {
+    return false;
+  }
   void CompletedSubmissionUpdated();
   void BeginSubmission();
   void BeginFrame();
@@ -49,7 +64,12 @@ class MetalTextureCache : public TextureCache {
   // Swap texture (front buffer presentation)
   // =========================================================================
 #ifdef __OBJC__
-  id<MTLTexture> RequestSwapTexture(xenos::TextureFormat& format_out);
+  id<MTLTexture> RequestSwapTexture(uint32_t frontbuffer_ptr,
+                                    uint32_t frontbuffer_width,
+                                    uint32_t frontbuffer_height,
+                                    uint32_t& width_out,
+                                    uint32_t& height_out,
+                                    xenos::TextureFormat& format_out);
 #endif
 
   uint32_t draw_resolution_scale_x() const { return 1; }

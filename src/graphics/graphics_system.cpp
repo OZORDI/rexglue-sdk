@@ -210,9 +210,7 @@ uint32_t GraphicsSystem::ReadRegister(uint32_t addr) {
                   // maximum [width(0x0FFF), height(0x0FFF)]
       return 0x050002D0;
     default:
-      if (!register_file_.GetRegisterInfo(r)) {
-        REXGPU_ERROR("GPU: Read from unknown register ({:04X})", r);
-      }
+      break;
   }
 
   assert_true(r < RegisterFile::kRegisterCount);
@@ -223,13 +221,17 @@ void GraphicsSystem::WriteRegister(uint32_t addr, uint32_t value) {
   uint32_t r = (addr & 0xFFFF) / 4;
 
   switch (r) {
-    case 0x01C5:  // CP_RB_WPTR
+    case 0x01C5: {  // CP_RB_WPTR
+        static int wptr_log_count = 0;
+        if (wptr_log_count < 5) {
+          REXGPU_INFO("CP_RB_WPTR write: value={:08X}", value);
+          wptr_log_count++;
+        }
         command_processor_->UpdateWritePointer(value);
-      break;
+      } break;
     case 0x1844:  // AVIVO_D1GRPH_PRIMARY_SURFACE_ADDRESS
       break;
     default:
-      REXGPU_WARN("Unknown GPU register {:04X} write: {:08X}", r, value);
       break;
   }
 
@@ -259,7 +261,9 @@ void GraphicsSystem::DispatchInterruptCallback(uint32_t source, uint32_t cpu) {
   }
 
   auto thread = kernel::XThread::GetCurrentThread();
-  assert_not_null(thread);
+  if (!thread) {
+    return;
+  }
 
   // Pick a CPU, if needed. We're going to guess 2. Because.
   if (cpu == 0xFFFFFFFF) {
@@ -276,8 +280,11 @@ void GraphicsSystem::DispatchInterruptCallback(uint32_t source, uint32_t cpu) {
 }
 
 void GraphicsSystem::MarkVblank() {
-  // TODO: Enable profiling once ported
-  // SCOPE_profile_cpu_f("gpu");
+  static int vblank_log_count = 0;
+  if (vblank_log_count < 5) {
+    REXGPU_INFO("MarkVblank #{} interrupt_callback_={:08X}", vblank_log_count, interrupt_callback_);
+    vblank_log_count++;
+  }
 
   // Increment vblank counter (so the game sees us making progress).
   if (command_processor_) {

@@ -311,6 +311,9 @@ using PFN_IRMetalLibBinaryCreate = IRMetalLibBinary* (*)();
 using PFN_IRMetalLibBinaryDestroy = void (*)(IRMetalLibBinary*);
 using PFN_IRMetalLibGetBytecodeSize = size_t (*)(IRMetalLibBinary*);
 using PFN_IRMetalLibGetBytecode = void (*)(IRMetalLibBinary*, uint8_t*);
+using PFN_IRMetalLibSynthesizeStageInFunction = bool (*)(
+    IRCompiler*, IRShaderReflection*, const IRVersionedInputLayoutDescriptor*,
+    IRMetalLibBinary*);
 using PFN_IRRootSignatureCreateFromDescriptor =
     IRRootSignature* (*)(const IRVersionedRootSignatureDescriptor*, IRError**);
 using PFN_IRRootSignatureDestroy = void (*)(IRRootSignature*);
@@ -348,6 +351,8 @@ using PFN_IRVersionedRootSignatureDescriptorCopyJSONString = const char* (*)(
     const IRVersionedRootSignatureDescriptor*);
 using PFN_IRVersionedRootSignatureDescriptorReleaseString = void (*)(
     const char*);
+using PFN_IRInputLayoutDescriptor1CopyJSONString = const char* (*) (const void*);
+using PFN_IRInputLayoutDescriptor1ReleaseString = void (*) (const char*);
 
 // ============================================================================
 // Helper: typed accessor for function pointers
@@ -463,6 +468,14 @@ bool MetalShaderConverter::Initialize() {
   LOAD_MSC_FN(IRShaderReflectionReleaseDomainInfo);
   LOAD_MSC_FN(IRVersionedRootSignatureDescriptorCopyJSONString);
   LOAD_MSC_FN(IRVersionedRootSignatureDescriptorReleaseString);
+
+  // Optional symbols used for stage-in synthesis.
+  msc_fn_.IRMetalLibSynthesizeStageInFunction =
+      dlsym(msc_lib_, "IRMetalLibSynthesizeStageInFunction");
+  msc_fn_.IRInputLayoutDescriptor1CopyJSONString =
+      dlsym(msc_lib_, "IRInputLayoutDescriptor1CopyJSONString");
+  msc_fn_.IRInputLayoutDescriptor1ReleaseString =
+      dlsym(msc_lib_, "IRInputLayoutDescriptor1ReleaseString");
 
 #undef LOAD_MSC_FN
 
@@ -678,13 +691,16 @@ bool MetalShaderConverter::Convert(xenos::ShaderType shader_type,
 bool MetalShaderConverter::ConvertWithStage(
     MetalShaderStage stage, const std::vector<uint8_t>& dxil_data,
     MetalShaderConversionResult& result) {
-  return ConvertWithStageEx(stage, dxil_data, result, nullptr, false,
+  return ConvertWithStageEx(stage, dxil_data, result, nullptr,
+                            nullptr, nullptr, false,
                             IRInputTopologyUndefined);
 }
 
 bool MetalShaderConverter::ConvertWithStageEx(
     MetalShaderStage stage, const std::vector<uint8_t>& dxil_data,
     MetalShaderConversionResult& result, MetalShaderReflectionInfo* reflection,
+    const IRVersionedInputLayoutDescriptor* input_layout,
+    std::vector<uint8_t>* stage_in_metallib,
     bool enable_geometry_emulation, int input_topology) {
   if (!is_available_) {
     result.success = false;
@@ -1007,6 +1023,26 @@ bool MetalShaderConverter::ConvertWithStageEx(
           }
         }
       }
+    }
+  }
+
+  if (stage == MetalShaderStage::kVertex && stage_in_metallib) {
+    stage_in_metallib->clear();
+  }
+  if (stage == MetalShaderStage::kVertex && input_layout && stage_in_metallib &&
+      shader_reflection && msc_fn_.IRMetalLibSynthesizeStageInFunction) {
+    IRMetalLibBinary* stage_in_lib = MSC_FN(IRMetalLibBinaryCreate)();
+    if (stage_in_lib) {
+      if (MSC_FN(IRMetalLibSynthesizeStageInFunction)(
+              compiler, shader_reflection, input_layout, stage_in_lib)) {
+        size_t stage_in_size = MSC_FN(IRMetalLibGetBytecodeSize)(stage_in_lib);
+        if (stage_in_size) {
+          stage_in_metallib->resize(stage_in_size);
+          MSC_FN(IRMetalLibGetBytecode)(stage_in_lib,
+                                        stage_in_metallib->data());
+        }
+      }
+      MSC_FN(IRMetalLibBinaryDestroy)(stage_in_lib);
     }
   }
 

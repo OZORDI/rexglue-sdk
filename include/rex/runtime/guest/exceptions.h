@@ -81,13 +81,44 @@ private:
 #ifndef _WIN32
 namespace detail {
 
-inline void signal_handler(int sig, siginfo_t* info, void* /*ucontext*/) {
+inline void signal_handler(int sig, siginfo_t* info, void* ucontext) {
     // Only handle if we're in SEH-protected code
     if (!g_seh_active) {
         // Not in SEH region - restore default handler and re-raise
         signal(sig, SIG_DFL);
         raise(sig);
         return;
+    }
+
+    // Get fault address
+    uintptr_t address = info ? reinterpret_cast<uintptr_t>(info->si_addr) : 0;
+
+    // NULL function pointer call: PPC_CALL_INDIRECT_FUNC looked up a
+    // missing entry in the function table (returned NULL) and called it.
+    // Recover by setting PC = LR so execution returns to the caller,
+    // just like ExceptionHandler's NULL-PC recovery.
+    if (address == 0 && sig == SIGSEGV && ucontext) {
+#if defined(__aarch64__) || defined(__arm64__)
+        auto* uc = reinterpret_cast<ucontext_t*>(ucontext);
+        // x30 = LR on ARM64
+        uint64_t lr = uc->uc_mcontext->__ss.__lr;
+        uc->uc_mcontext->__ss.__pc = lr;
+        return;  // resume at LR
+#elif defined(__x86_64__)
+        auto* uc = reinterpret_cast<ucontext_t*>(ucontext);
+#if defined(__APPLE__)
+        uint64_t rsp = uc->uc_mcontext->__ss.__rsp;
+        uint64_t ret_addr = *reinterpret_cast<uint64_t*>(rsp);
+        uc->uc_mcontext->__ss.__rip = ret_addr;
+        uc->uc_mcontext->__ss.__rsp = rsp + 8;
+#else
+        uint64_t rsp = uc->uc_mcontext.gregs[REG_RSP];
+        uint64_t ret_addr = *reinterpret_cast<uint64_t*>(rsp);
+        uc->uc_mcontext.gregs[REG_RIP] = ret_addr;
+        uc->uc_mcontext.gregs[REG_RSP] = rsp + 8;
+#endif
+        return;  // resume at return address
+#endif
     }
 
     // Determine exception code based on signal
@@ -109,9 +140,6 @@ inline void signal_handler(int sig, siginfo_t* info, void* /*ucontext*/) {
             code = SehException::UNKNOWN;
             break;
     }
-
-    // Get fault address
-    uintptr_t address = info ? reinterpret_cast<uintptr_t>(info->si_addr) : 0;
 
     // Use libunwind to throw from signal context
     // This works because libunwind can unwind through signal frames

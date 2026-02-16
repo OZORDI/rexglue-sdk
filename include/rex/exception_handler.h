@@ -531,6 +531,11 @@ class ExceptionHandler {
 
   // Uninstalls a previously-installed exception handler.
   static void Uninstall(Handler fn, void* data);
+
+  // Force re-registration of ExceptionHandlerCallback as the active POSIX
+  // signal handler.  Call after SEH/guest installs its own handler so
+  // ExceptionHandler runs first and chains to SEH for unhandled faults.
+  static void ReinstallSignalHandlers();
 };
 
 }  // namespace rex::arch

@@ -164,10 +164,12 @@ dword_result_t ExCreateThread_entry(lpdword_t handle_ptr, dword_t stack_size,
 }
 
 dword_result_t ExTerminateThread_entry(dword_t exit_code) {
-  XThread* thread = XThread::GetCurrentThread();
-
-  // NOTE: this kills us right now. We won't return from it.
-  return thread->Exit(exit_code);
+  // Throw to unwind cleanly through any SEH catch(...) blocks back to
+  // XThread::Execute, which catches thread_terminate_exception and calls
+  // Exit().  Calling Exit() directly here would invoke pthread_exit()
+  // whose stack unwinding is caught by catch(...) on macOS, corrupting
+  // thread state and crashing the logging mutex.
+  throw rex::kernel::thread_terminate_exception(static_cast<int>(exit_code));
 }
 
 dword_result_t NtResumeThread_entry(dword_t handle,
@@ -794,13 +796,8 @@ dword_result_t KeWaitForSingleObject_entry(lpvoid_t object_ptr,
                                            dword_t alertable,
                                            lpqword_t timeout_ptr) {
   uint64_t timeout = timeout_ptr ? static_cast<uint64_t>(*timeout_ptr) : 0u;
- // REXKRNL_IMPORT_TRACE("KeWaitForSingleObject", "obj={:#x} reason={} mode={} alertable={} timeout={}",
-         //object_ptr.guest_address(), (uint32_t)wait_reason,
-         //(uint32_t)processor_mode, (uint32_t)alertable,
-         //timeout_ptr ? (int64_t)timeout : -1);
   auto result = xeKeWaitForSingleObject(object_ptr, wait_reason, processor_mode,
                                         alertable, timeout_ptr ? &timeout : nullptr);
- // REXKRNL_IMPORT_RESULT("KeWaitForSingleObject", "{:#x}", result);
   return result;
 }
 

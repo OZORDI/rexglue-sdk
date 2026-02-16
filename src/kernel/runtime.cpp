@@ -39,7 +39,9 @@
 #include <rex/graphics/flags.h>
 #include <rex/audio/audio_system.h>
 #include <rex/audio/nop/nop_audio_system.h>
+#if defined(REX_HAS_SDL_AUDIO)
 #include <rex/audio/sdl/sdl_audio_system.h>
+#endif
 #endif
 
 namespace rex {
@@ -67,20 +69,18 @@ X_STATUS Runtime::Setup(bool tool_mode) {
   // Enable threading affinity configuration
   thread::EnableAffinityConfiguration();
 
-  // Guard against reinitialization
-  if (memory_) {
-    REXKRNL_ERROR("Runtime::Setup() called but already initialized");
-    return X_STATUS_UNSUCCESSFUL;
-  }
-
   tool_mode_ = tool_mode;
 
-  // Create memory system first
-  memory_ = std::make_unique<memory::Memory>();
-  if (!memory_->Initialize()) {
-    REXKRNL_ERROR("Failed to initialize memory system");
-    memory_.reset();
-    return X_STATUS_UNSUCCESSFUL;
+  // Create memory system first (skip if pre-injected via set_memory())
+  if (!memory_) {
+    memory_ = std::make_unique<memory::Memory>();
+    if (!memory_->Initialize()) {
+      REXKRNL_ERROR("Failed to initialize memory system");
+      memory_.reset();
+      return X_STATUS_UNSUCCESSFUL;
+    }
+  } else {
+    REXKRNL_INFO("Runtime::Setup() using pre-existing memory system");
   }
 
 
@@ -108,12 +108,15 @@ X_STATUS Runtime::Setup(bool tool_mode) {
 #if !defined(REX_HEADLESS)
   // Initialize the APU (Audio Processing Unit)
   const char* audio_backend_name = nullptr;
+#if defined(REX_HAS_SDL_AUDIO)
   if (!tool_mode_) {
     audio_system_ = audio::sdl::SDLAudioSystem::Create(processor_.get());
     audio_backend_name = "SDL";
-  } else {
+  } else
+#endif
+  {
     audio_system_ = audio::nop::NopAudioSystem::Create(processor_.get());
-    audio_backend_name = "NOP (tool mode)";
+    audio_backend_name = "NOP";
   }
   if (audio_system_) {
     X_STATUS audio_status = audio_system_->Setup(kernel_state_.get());
@@ -145,18 +148,41 @@ X_STATUS Runtime::Setup(bool tool_mode) {
   std::string gpu_backend = REXCVAR_GET(gpu);
   REXKRNL_INFO("GPU backend preference: '{}'", gpu_backend);
 
+#if REX_HAS_D3D12
+  constexpr bool has_d3d12_support = true;
+#else
+  constexpr bool has_d3d12_support = false;
+#endif
+#if REX_HAS_METAL
+  constexpr bool has_metal_support = true;
+#else
+  constexpr bool has_metal_support = false;
+#endif
+  REXKRNL_INFO("GPU backend build support: vulkan=1, d3d12={}, metal={}",
+               has_d3d12_support, has_metal_support);
+
   if (gpu_backend == "any") {
 #if REX_HAS_D3D12
-    if (graphics::d3d12::D3D12GraphicsSystem::IsAvailable()) {
+    bool d3d12_available = graphics::d3d12::D3D12GraphicsSystem::IsAvailable();
+    if (d3d12_available) {
       graphics_system_ = std::make_unique<graphics::d3d12::D3D12GraphicsSystem>();
       REXKRNL_INFO("Auto-selected D3D12 GPU backend");
+    } else {
+      REXKRNL_INFO("D3D12 GPU backend compiled in, but unavailable on this system");
     }
 #endif
 #if REX_HAS_METAL
-    if (!graphics_system_ && graphics::metal::MetalGraphicsSystem::IsAvailable()) {
-      graphics_system_ = std::make_unique<graphics::metal::MetalGraphicsSystem>();
-      REXKRNL_INFO("Auto-selected Metal GPU backend");
+    if (!graphics_system_) {
+      bool metal_available = graphics::metal::MetalGraphicsSystem::IsAvailable();
+      if (metal_available) {
+        graphics_system_ = std::make_unique<graphics::metal::MetalGraphicsSystem>();
+        REXKRNL_INFO("Auto-selected Metal GPU backend");
+      } else {
+        REXKRNL_INFO("Metal GPU backend compiled in, but unavailable on this system");
+      }
     }
+#else
+    REXKRNL_INFO("Metal GPU backend compiled out (REXGLUE_USE_METAL=OFF)");
 #endif
     if (!graphics_system_) {
       graphics_system_ = std::make_unique<graphics::vulkan::VulkanGraphicsSystem>();
@@ -172,6 +198,12 @@ X_STATUS Runtime::Setup(bool tool_mode) {
     graphics_system_ = std::make_unique<graphics::d3d12::D3D12GraphicsSystem>();
     REXKRNL_INFO("Using D3D12 GPU backend (explicit)");
   }
+#else
+  else if (gpu_backend == "d3d12") {
+    REXKRNL_ERROR("D3D12 GPU backend requested, but this build was compiled "
+                  "without D3D12 support");
+    return X_STATUS_UNSUCCESSFUL;
+  }
 #endif
 #if REX_HAS_METAL
   else if (gpu_backend == "metal") {
@@ -182,14 +214,22 @@ X_STATUS Runtime::Setup(bool tool_mode) {
     graphics_system_ = std::make_unique<graphics::metal::MetalGraphicsSystem>();
     REXKRNL_INFO("Using Metal GPU backend (explicit)");
   }
+#else
+  else if (gpu_backend == "metal") {
+    REXKRNL_ERROR("Metal GPU backend requested, but this build was compiled "
+                  "without Metal support");
+    return X_STATUS_UNSUCCESSFUL;
+  }
 #endif
   else if (gpu_backend == "vulkan") {
     graphics_system_ = std::make_unique<graphics::vulkan::VulkanGraphicsSystem>();
     REXKRNL_INFO("Using Vulkan GPU backend (explicit)");
   }
   else {
-    REXKRNL_ERROR("Unknown GPU backend '{}' - valid: any, d3d12, vulkan, metal",
-                  gpu_backend);
+    REXKRNL_ERROR("Unknown GPU backend '{}'.", gpu_backend);
+    REXKRNL_ERROR("Available GPU backend options in this build: any, vulkan{}{}",
+                  has_d3d12_support ? ", d3d12" : "",
+                  has_metal_support ? ", metal" : "");
     return X_STATUS_UNSUCCESSFUL;
   }
   X_STATUS gpu_status = graphics_system_->Setup( processor_.get(), kernel_state_.get(),

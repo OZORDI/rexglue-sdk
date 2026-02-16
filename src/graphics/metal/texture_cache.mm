@@ -19,6 +19,7 @@
 #include <rex/math.h>
 #include <rex/ui/metal/metal_provider.h>
 #include <rex/logging.h>
+#include <rex/xenia_logging_compat.h>
 
 namespace rex::graphics::metal {
 
@@ -195,7 +196,7 @@ MTLPixelFormat MetalTextureCache::XenosFormatToMetal(
     case xenos::TextureFormat::k_5_6_5:
       // No direct Metal equivalent; use RGBA8 and convert on CPU.
       return MTLPixelFormatRGBA8Unorm;
-    case xenos::TextureFormat::k_5_5_5_1:
+    case xenos::TextureFormat::k_1_5_5_5:
       return MTLPixelFormatBGR5A1Unorm;
     case xenos::TextureFormat::k_4_4_4_4:
       return MTLPixelFormatABGR4Unorm;
@@ -244,7 +245,7 @@ uint32_t MetalTextureCache::GetBytesPerPixel(xenos::TextureFormat format) {
     case xenos::TextureFormat::k_8: return 1;
     case xenos::TextureFormat::k_8_8: return 2;
     case xenos::TextureFormat::k_5_6_5: return 2;
-    case xenos::TextureFormat::k_5_5_5_1: return 2;
+    case xenos::TextureFormat::k_1_5_5_5: return 2;
     case xenos::TextureFormat::k_4_4_4_4: return 2;
     case xenos::TextureFormat::k_16: return 2;
     case xenos::TextureFormat::k_16_FLOAT: return 2;
@@ -349,7 +350,7 @@ MetalTextureCache::MetalTextureCache(
     MetalCommandProcessor& command_processor,
     const RegisterFile& register_file,
     MetalSharedMemory& shared_memory)
-    : TextureCache(register_file, shared_memory),
+    : TextureCache(register_file, shared_memory, 1, 1),
       command_processor_(command_processor),
       shared_memory_(shared_memory) {
   std::memset(fetch_constants_dirty_, 0, sizeof(fetch_constants_dirty_));
@@ -415,7 +416,7 @@ const MetalTextureCache::CachedTexture* MetalTextureCache::RequestTexture(
     uint32_t fetch_index) {
   if (fetch_index >= 32) return nullptr;
 
-  auto& regs = register_file_;
+  const auto& regs = register_file();
   auto fetch = regs.GetTextureFetch(fetch_index);
 
   if (fetch.type != xenos::FetchConstantType::kTexture) return nullptr;
@@ -607,28 +608,63 @@ const MetalTextureCache::CachedTexture* MetalTextureCache::RequestTexture(
 // ============================================================================
 
 id<MTLTexture> MetalTextureCache::RequestSwapTexture(
+    uint32_t frontbuffer_ptr, uint32_t frontbuffer_width,
+    uint32_t frontbuffer_height, uint32_t& width_out, uint32_t& height_out,
     xenos::TextureFormat& format_out) {
-  auto& regs = register_file_;
+  uint32_t guest_address = frontbuffer_ptr;
+  uint32_t width = frontbuffer_width;
+  uint32_t height = frontbuffer_height;
+  xenos::TextureFormat format = xenos::TextureFormat::k_8_8_8_8;
+  bool is_tiled = false;
+  xenos::Endian endian = xenos::Endian::kNone;
+
+  const auto& regs = register_file();
   auto fetch = regs.GetTextureFetch(0);
+  bool fetch_valid =
+      fetch.type == xenos::FetchConstantType::kTexture &&
+      fetch.dimension == xenos::DataDimension::k2DOrStacked;
+  if (fetch_valid) {
+    uint32_t fetch_address = fetch.base_address << 12;
+    uint32_t fetch_width = fetch.size_2d.width + 1;
+    uint32_t fetch_height = fetch.size_2d.height + 1;
+    if (guest_address == 0) {
+      guest_address = fetch_address;
+    }
+    if (width == 0) {
+      width = fetch_width;
+    }
+    if (height == 0) {
+      height = fetch_height;
+    }
 
-  if (fetch.type != xenos::FetchConstantType::kTexture) return nil;
+    format = static_cast<xenos::TextureFormat>(fetch.format);
+    is_tiled = fetch.tiled;
+    endian = fetch.endianness;
 
-  uint32_t guest_address = fetch.base_address << 12;
-  if (guest_address == 0) return nil;
+    if (frontbuffer_ptr != 0 && fetch_address != 0 &&
+        frontbuffer_ptr != fetch_address) {
+      static uint32_t swap_ptr_mismatch_log_count = 0;
+      if (swap_ptr_mismatch_log_count < 32) {
+        XELOGW("MetalTextureCache: Swap ptr mismatch packet=0x{:08X} fetch0=0x{:08X}",
+               frontbuffer_ptr, fetch_address);
+        swap_ptr_mismatch_log_count++;
+      }
+    }
+  }
 
-  auto dimension = fetch.dimension;
-  if (dimension != xenos::DataDimension::k2DOrStacked) return nil;
+  if (guest_address == 0 || width == 0 || height == 0) {
+    return nil;
+  }
 
-  uint32_t width = fetch.size_2d.width + 1;
-  uint32_t height = fetch.size_2d.height + 1;
-  xenos::TextureFormat format =
-      static_cast<xenos::TextureFormat>(fetch.format);
   format_out = format;
-
-  if (width == 0 || height == 0) return nil;
+  width_out = width;
+  height_out = height;
 
   MTLPixelFormat metal_format = MTLPixelFormatRGBA8Unorm;
   uint32_t bpp = GetBytesPerPixel(format);
+  if (bpp == 0) {
+    bpp = 4;
+  }
 
   // Always output swap as RGBA8 for simplicity.
   if (swap_texture_ && (swap_texture_width_ != width ||
@@ -664,13 +700,12 @@ id<MTLTexture> MetalTextureCache::RequestSwapTexture(
       static_cast<const uint8_t*>(shared_memory_.buffer_contents());
   if (!shared_mem) return nil;
 
-  if (guest_address + width * height * bpp > MetalSharedMemory::kBufferSize) {
+  uint64_t required_bytes = uint64_t(width) * uint64_t(height) * uint64_t(bpp);
+  if (uint64_t(guest_address) + required_bytes > MetalSharedMemory::kBufferSize) {
     return nil;
   }
 
   const uint8_t* src = shared_mem + guest_address;
-  bool is_tiled = fetch.tiled;
-  xenos::Endian endian = fetch.endianness;
 
   // Untile + endian swap into temp buffer, then upload.
   uint32_t row_pitch = width * 4;  // RGBA8 output

@@ -13,14 +13,14 @@
 #include <rex/graphics/metal/command_processor.h>
 #include <rex/ui/metal/metal_provider.h>
 #include <rex/logging.h>
+#include <rex/xenia_logging_compat.h>
 #include <rex/memory.h>
 
 namespace rex::graphics::metal {
 
 MetalSharedMemory::MetalSharedMemory(MetalCommandProcessor& command_processor,
-                                     memory::Memory& memory,
-                                     TraceWriter& trace_writer)
-    : SharedMemory(memory, trace_writer),
+                                     memory::Memory& memory)
+    : SharedMemory(memory),
       command_processor_(command_processor) {
   dirty_bitmap_.resize(kDirtyBitmapSize, 0);
   dirty_ranges_.reserve(256);
@@ -139,7 +139,7 @@ size_t MetalSharedMemory::UploadDirtyPages() {
 
   uint8_t* buffer_ptr = static_cast<uint8_t*>([buffer_ contents]);
   const uint8_t* guest_memory_base =
-      memory_.TranslatePhysical<const uint8_t>(0);
+      memory().TranslatePhysical<const uint8_t*>(0);
 
   // ---- Phase 1: Collect dirty page ranges under lock ----
   dirty_ranges_.clear();
@@ -236,6 +236,64 @@ void MetalSharedMemory::ResetStats() {
   upload_stats_.total_bytes_uploaded.store(0, std::memory_order_relaxed);
   upload_stats_.total_uploads.store(0, std::memory_order_relaxed);
   upload_stats_.coalesced_ranges.store(0, std::memory_order_relaxed);
+}
+
+bool MetalSharedMemory::UploadRanges(
+    const std::vector<std::pair<uint32_t, uint32_t>>& upload_page_ranges) {
+  if (!buffer_) return false;
+
+  uint8_t* buffer_ptr = static_cast<uint8_t*>([buffer_ contents]);
+  const uint8_t* guest_memory_base =
+      memory().TranslatePhysical<const uint8_t*>(0);
+  if (!buffer_ptr || !guest_memory_base) {
+    return false;
+  }
+
+  uint32_t sync_start = UINT32_MAX;
+  uint32_t sync_end = 0;
+  size_t total_bytes = 0;
+
+  for (const auto& upload_range : upload_page_ranges) {
+    uint32_t page_start = upload_range.first;
+    uint32_t page_count = upload_range.second;
+    if (!page_count) {
+      continue;
+    }
+
+    uint64_t offset_64 = uint64_t(page_start) << page_size_log2();
+    uint64_t length_64 = uint64_t(page_count) << page_size_log2();
+    if (offset_64 >= kBufferSize) {
+      continue;
+    }
+    if (offset_64 + length_64 > kBufferSize) {
+      length_64 = kBufferSize - offset_64;
+    }
+
+    uint32_t offset = uint32_t(offset_64);
+    uint32_t length = uint32_t(length_64);
+
+    // Mark range valid before copying to avoid losing invalidations that may
+    // happen while the memcpy is in progress.
+    MakeRangeValid(offset, length, false, false);
+
+    std::memcpy(buffer_ptr + offset, guest_memory_base + offset, length);
+    total_bytes += length;
+
+    if (offset < sync_start) sync_start = offset;
+    if (offset + length > sync_end) sync_end = offset + length;
+  }
+
+  if (total_bytes > 0 && buffer_.storageMode == MTLStorageModeManaged) {
+    [buffer_ didModifyRange:NSMakeRange(sync_start, sync_end - sync_start)];
+  }
+
+  upload_stats_.total_bytes_uploaded.fetch_add(total_bytes,
+                                               std::memory_order_relaxed);
+  upload_stats_.total_uploads.fetch_add(1, std::memory_order_relaxed);
+  upload_stats_.coalesced_ranges.fetch_add(upload_page_ranges.size(),
+                                           std::memory_order_relaxed);
+
+  return true;
 }
 
 bool MetalSharedMemory::AllocateSparseHostGpuMemoryRange(

@@ -2507,7 +2507,7 @@ VkShaderModule VulkanRenderTargetCache::GetTransferShader(
   std::vector<std::vector<spv::Decoration>> main_precisions;
   spv::Block* main_entry;
   spv::Function* main_function =
-      builder.makeFunctionEntry(spv::NoPrecision, type_void, "main",
+      builder.makeFunctionEntry(spv::NoPrecision, type_void, "main", spv::LinkageTypeMax,
                                 main_param_types, main_precisions, &main_entry);
 
   // Working with unsigned numbers for simplicity now, bitcasting to signed will
@@ -5529,7 +5529,7 @@ VkPipeline VulkanRenderTargetCache::GetDumpPipeline(DumpPipelineKey key) {
   std::vector<std::vector<spv::Decoration>> main_precisions;
   spv::Block* main_entry;
   spv::Function* main_function =
-      builder.makeFunctionEntry(spv::NoPrecision, type_void, "main",
+      builder.makeFunctionEntry(spv::NoPrecision, type_void, "main", spv::LinkageTypeMax,
                                 main_param_types, main_precisions, &main_entry);
 
   // For now, as the exact addressing in 64bpp render targets relatively to

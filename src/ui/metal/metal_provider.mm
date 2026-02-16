@@ -49,7 +49,7 @@ bool MetalProvider::Initialize(bool with_gpu_emulation,
                                bool with_presentation) {
   device_ = MTLCreateSystemDefaultDevice();
   if (!device_) {
-    XELOGE("MetalProvider: Failed to create Metal device");
+    REXLOG_ERROR("MetalProvider: Failed to create Metal device");
     return false;
   }
 
@@ -64,7 +64,7 @@ bool MetalProvider::Initialize(bool with_gpu_emulation,
     command_queue_ = [device_ newCommandQueue];
   }
   if (!command_queue_) {
-    XELOGE("MetalProvider: Failed to create command queue");
+    REXLOG_ERROR("MetalProvider: Failed to create command queue");
     return false;
   }
 
@@ -224,15 +224,15 @@ void MetalProvider::DetectCapabilities() {
 
 void MetalProvider::LogCapabilities() const {
   auto& c = caps_;
-  XELOGI("MetalProvider: Device: {}", c.device_name);
-  XELOGI("MetalProvider: Apple GPU: {}, Unified memory: {}, GPU Family: {}",
+  REXLOG_INFO("MetalProvider: Device: {}", c.device_name);
+  REXLOG_INFO("MetalProvider: Apple GPU: {}, Unified memory: {}, GPU Family: {}",
          c.is_apple_gpu ? "yes" : "no",
          c.has_unified_memory ? "yes" : "no",
          c.gpu_family);
-  XELOGI("MetalProvider: Max buffer: {} MB, Working set: {} MB",
+  REXLOG_INFO("MetalProvider: Max buffer: {} MB, Working set: {} MB",
          c.max_buffer_length / (1024 * 1024),
          c.recommended_working_set / (1024 * 1024));
-  XELOGI("MetalProvider: Features: ROG={}, TileShading={}, SIMD={}, "
+  REXLOG_INFO("MetalProvider: Features: ROG={}, TileShading={}, SIMD={}, "
          "BC={}, MSAA={}x",
          c.supports_raster_order_groups ? "yes" : "no",
          c.supports_tile_shading ? "yes" : "no",
@@ -240,14 +240,14 @@ void MetalProvider::LogCapabilities() const {
          c.supports_bc_texture_compression ? "yes" : "no",
          c.supports_msaa_8x ? 8 : (c.supports_msaa_4x ? 4 :
                                     (c.supports_msaa_2x ? 2 : 1)));
-  XELOGI("MetalProvider: Max texture: {}x{}, Max threads/group: {}",
+  REXLOG_INFO("MetalProvider: Max texture: {}x{}, Max threads/group: {}",
          c.max_texture_width_2d, c.max_texture_height_2d,
          c.max_threads_per_threadgroup_dimension);
 
   if (c.CanUseTileShadingForEdram()) {
-    XELOGI("MetalProvider: Will use tile shading for EDRAM emulation");
+    REXLOG_INFO("MetalProvider: Will use tile shading for EDRAM emulation");
   } else {
-    XELOGI("MetalProvider: Using standard buffer for EDRAM emulation");
+    REXLOG_INFO("MetalProvider: Using standard buffer for EDRAM emulation");
   }
 }
 
@@ -272,7 +272,7 @@ bool MetalProvider::BeginGpuCapture() {
         [MTLCaptureManager sharedCaptureManager];
     if (![capture_manager supportsDestination:
             MTLCaptureDestinationGPUTraceDocument]) {
-      XELOGW("MetalProvider: GPU capture to trace document not supported");
+      REXLOG_WARN("MetalProvider: GPU capture to trace document not supported");
       // Try developer tools destination instead.
     }
 
@@ -285,16 +285,16 @@ bool MetalProvider::BeginGpuCapture() {
     if ([capture_manager startCaptureWithDescriptor:capture_desc
                                               error:&error]) {
       is_capturing_ = true;
-      XELOGI("MetalProvider: GPU capture started");
+      REXLOG_INFO("MetalProvider: GPU capture started");
       return true;
     } else {
-      XELOGW("MetalProvider: Failed to start GPU capture: {}",
+      REXLOG_WARN("MetalProvider: Failed to start GPU capture: {}",
              error ? [[error localizedDescription] UTF8String] : "unknown");
       return false;
     }
   }
 
-  XELOGW("MetalProvider: GPU capture requires macOS 10.15+");
+  REXLOG_WARN("MetalProvider: GPU capture requires macOS 10.15+");
   return false;
 }
 
@@ -306,7 +306,7 @@ void MetalProvider::EndGpuCapture() {
         [MTLCaptureManager sharedCaptureManager];
     [capture_manager stopCapture];
     is_capturing_ = false;
-    XELOGI("MetalProvider: GPU capture stopped");
+    REXLOG_INFO("MetalProvider: GPU capture stopped");
   }
 }
 

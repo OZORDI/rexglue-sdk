@@ -269,6 +269,7 @@ void VdInitializeRingBuffer_entry(lpvoid_t ptr, int_t size_log2) {
   // r3 = result of MmGetPhysicalAddress
   // r4 = log2(size)
   // Buffer pointers are from MmAllocatePhysicalMemory with WRITE_COMBINE.
+  REXKRNL_INFO("VdInitializeRingBuffer: ptr=0x{:08X} size_log2={}", (uint32_t)ptr, (int)size_log2);
 #if !defined(REX_HEADLESS)
   auto graphics_system = kernel_state()->emulator()->graphics_system();
   graphics_system->InitializeRingBuffer(ptr, size_log2);
@@ -278,6 +279,7 @@ void VdInitializeRingBuffer_entry(lpvoid_t ptr, int_t size_log2) {
 void VdEnableRingBufferRPtrWriteBack_entry(lpvoid_t ptr,
                                            int_t block_size_log2) {
   // r4 = log2(block size), 6, usually --- <=19
+  REXKRNL_INFO("VdEnableRingBufferRPtrWriteBack: ptr=0x{:08X} block_size_log2={}", (uint32_t)ptr, (int)block_size_log2);
 #if !defined(REX_HEADLESS)
   auto graphics_system = kernel_state()->emulator()->graphics_system();
   graphics_system->EnableReadPointerWriteBack(ptr, block_size_log2);
@@ -385,6 +387,9 @@ void VdSwap_entry(
     lpdword_t texture_format_ptr, lpdword_t color_space_ptr, lpdword_t width,
     lpdword_t height) {
 #if !defined(REX_HEADLESS)
+  static int vd_swap_log_count = 0;
+  bool log_vd_swap = vd_swap_log_count < 24;
+
   // All of these parameters are REQUIRED.
   assert(buffer_ptr);
   assert(fetch_ptr);
@@ -392,6 +397,16 @@ void VdSwap_entry(
   assert(texture_format_ptr);
   assert(width);
   assert(height);
+
+  if (log_vd_swap) {
+    REXKRNL_INFO(
+        "VdSwap[{}] begin: buffer={:08X} fetch={:08X} fb_ptr={:08X} "
+        "fmt_ptr={:08X} width_ptr={:08X} height_ptr={:08X}",
+        vd_swap_log_count, static_cast<uint32_t>(buffer_ptr),
+        static_cast<uint32_t>(fetch_ptr), static_cast<uint32_t>(frontbuffer_ptr),
+        static_cast<uint32_t>(texture_format_ptr), static_cast<uint32_t>(width),
+        static_cast<uint32_t>(height));
+  }
 
   namespace xenos = rex::graphics::xenos;
 
@@ -407,12 +422,28 @@ void VdSwap_entry(
   if (frontbuffer_physical_address == UINT32_MAX) {
     REXKRNL_ERROR("VdSwap: Invalid front buffer virtual address 0x{:08X}",
            frontbuffer_virtual_address);
+    if (log_vd_swap) {
+      vd_swap_log_count++;
+    }
     return;
   }
   gpu_fetch.base_address = frontbuffer_physical_address >> 12;
 
   auto texture_format = rex::graphics::xenos::TextureFormat(texture_format_ptr.value());
   auto color_space = *color_space_ptr;
+
+  if (log_vd_swap) {
+    REXKRNL_INFO(
+        "VdSwap[{}] resolved: fb_va={:08X} fb_pa={:08X} fetch_wh={}x{} "
+        "guest_wh={}x{} format={:08X} color_space={:08X}",
+        vd_swap_log_count, frontbuffer_virtual_address,
+        frontbuffer_physical_address,
+        static_cast<uint32_t>(gpu_fetch.size_2d.width),
+        static_cast<uint32_t>(gpu_fetch.size_2d.height), width.value(),
+        height.value(),
+        texture_format_ptr.value(), static_cast<uint32_t>(color_space));
+  }
+
   assert_true(texture_format == rex::graphics::xenos::TextureFormat::k_8_8_8_8 ||
               texture_format ==
                   rex::graphics::xenos::TextureFormat::k_2_10_10_10_AS_16_16_16_16);
@@ -443,6 +474,16 @@ void VdSwap_entry(
 
   for (uint32_t i = offset; i < 64; i++) {
     dwords[i] = xenos::MakePacketType2();
+  }
+
+  if (log_vd_swap) {
+    REXKRNL_INFO(
+        "VdSwap[{}] packet ready: type3={:08X} sig={:08X} fb_pa={:08X} "
+        "width={} height={}",
+        vd_swap_log_count, static_cast<uint32_t>(dwords[7]),
+        static_cast<uint32_t>(dwords[8]), static_cast<uint32_t>(dwords[9]),
+        static_cast<uint32_t>(dwords[10]), static_cast<uint32_t>(dwords[11]));
+    vd_swap_log_count++;
   }
 #endif  // !REX_HEADLESS
 }

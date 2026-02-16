@@ -37,14 +37,13 @@
 // everywhere and adding it to every single memory access.
 // Maybe a separate base pointer for the 0xE0 heap?
 //=============================================================================
-#ifdef _WIN32
+#if defined(_WIN32) || (defined(__APPLE__) && defined(__aarch64__))
+// Windows (64KB granularity) and macOS ARM64 (16KB granularity) both mask
+// away the 0x1000 file offset for the E0 physical heap during mmap.
+// Compensate by adding 0x1000 to host addresses for guest addrs >= 0xE0000000.
 #define PPC_PHYS_HOST_OFFSET(addr) (((uint32_t)(addr) >= 0xE0000000u) ? 0x1000u : 0u)
-#elif defined(__APPLE__)
-// macOS: 16KB pages on ARM64, 4KB on x86_64. Both have page-granularity mmap
-// offsets, so file offsets work correctly like Linux.
-#define PPC_PHYS_HOST_OFFSET(addr) 0u
 #else
-#define PPC_PHYS_HOST_OFFSET(addr) 0u  // Linux has 4KB granularity, file offset works
+#define PPC_PHYS_HOST_OFFSET(addr) 0u  // Linux/macOS x86_64: 4KB granularity, file offset works
 #endif
 
 // Raw address calculation with physical offset (for operations that don't use PPC_LOAD/PPC_STORE)
