@@ -1,0 +1,479 @@
+[1/650] Building C object thirdparty/disasm/CMakeFiles/disasm.dir/Release/disasm.c.o
+[2/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/code_emitter.cpp.o
+[3/650] Building C object thirdparty/disasm/CMakeFiles/disasm.dir/Release/ppc-dis.c.o
+[4/650] Linking C shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libdisasm.dylib"
+[5/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/decoded_binary.cpp.o
+[6/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/recompile.cpp.o
+[7/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/vtable_scanner.cpp.o
+[8/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/sig_scanner.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/sig_scanner.cpp:11:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/sig_scanner.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/sig_scanner.cpp:11:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/sig_scanner.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:27:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+3 warnings generated.
+[9/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/function_scanner.cpp.o
+[10/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/discovery.cpp.o
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/discovery.cpp:56:58: warning: unused parameter 'addr' [-Wunused-parameter]
+   56 | bool isBlockTerminator(const DecodedInsn& insn, uint32_t addr,
+      |                                                          ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/discovery.cpp:313:18: warning: variable 'writesToIndexReg' set but not used [-Wunused-but-set-variable]
+  313 |             bool writesToIndexReg = false;
+      |                  ^
+2 warnings generated.
+[11/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/instruction_dispatch.cpp.o
+[12/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/codegen.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen.cpp:15:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:18:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/export_resolver.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen.cpp:15:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen.cpp:15:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:20:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+4 warnings generated.
+[13/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/function_graph.cpp.o
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/function_graph.cpp:303:41: warning: unused parameter 'emit' [-Wunused-parameter]
+  303 | void FunctionNode::emitCpp(CodeEmitter& emit) const {
+      |                                         ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/function_graph.cpp:339:44: warning: unused parameter 'baseAddress' [-Wunused-parameter]
+  339 | void FunctionGraph::addCodeBuffer(uint32_t baseAddress, const uint8_t* data, size_t size) {
+      |                                            ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/function_graph.cpp:339:72: warning: unused parameter 'data' [-Wunused-parameter]
+  339 | void FunctionGraph::addCodeBuffer(uint32_t baseAddress, const uint8_t* data, size_t size) {
+      |                                                                        ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/function_graph.cpp:339:85: warning: unused parameter 'size' [-Wunused-parameter]
+  339 | void FunctionGraph::addCodeBuffer(uint32_t baseAddress, const uint8_t* data, size_t size) {
+      |                                                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/function_graph.cpp:350:54: warning: unused parameter 'addr' [-Wunused-parameter]
+  350 | const uint8_t* FunctionGraph::translateCode(uint32_t addr) const {
+      |                                                      ^
+5 warnings generated.
+[14/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/ppc/disasm.cpp.o
+[15/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/binary_view.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/binary_view.cpp:12:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/binary_view.cpp:12:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:27:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+3 warnings generated.
+[16/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/ppc/opcode.cpp.o
+[17/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/ppc/instruction.cpp.o
+[18/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/test_module.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/test_module.cpp:12:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/test_module.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/test_module.cpp:12:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/test_module.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:27:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+3 warnings generated.
+[19/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/recompiler.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/recompiler.cpp:30:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:18:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/export_resolver.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/recompiler.cpp:30:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/recompiler.cpp:30:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:20:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/recompiler.cpp:79:18: warning: unused variable 'kProgressLogFrequency' [-Wunused-const-variable]
+   79 | constexpr size_t kProgressLogFrequency = 100;
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+[20/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/config.cpp.o
+[21/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/test_analyze.cpp.o
+[22/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/output.cpp.o
+[23/650] Building CXX object thirdparty/abseil-cpp/absl/base/CMakeFiles/strerror.dir/Release/internal/strerror.cc.o
+[24/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/analyze.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/analyze.cpp:17:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/export_resolver.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/analyze.cpp:1332:23: warning: variable 'containingFunc' set but not used [-Wunused-but-set-variable]
+ 1332 |             if (auto* containingFunc = graph.getFunctionContaining(segment.start)) {
+      |                       ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/analyze.cpp:1102:6: warning: unused function 'functionPointerScan' [-Wunused-function]
+ 1102 | void functionPointerScan(CodegenContext& ctx) {
+      |      ^~~~~~~~~~~~~~~~~~~
+3 warnings generated.
+[25/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/comparison.cpp.o
+[26/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_globals.dylib'
+[27/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/arithmetic.cpp.o
+[28/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/control_flow.cpp.o
+[29/650] Building CXX object thirdparty/abseil-cpp/absl/debugging/CMakeFiles/examine_stack.dir/Release/internal/examine_stack.cc.o
+[30/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/logical.cpp.o
+[31/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_globals.dylib'
+[32/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_sink.dylib'
+[33/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_nullguard.dir/Release/internal/nullguard.cc.o
+[34/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_proto.dir/Release/internal/proto.cc.o
+[35/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_randen_slow.dylib'
+[36/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_randen_hwaes.dylib'
+[37/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_format.dir/Release/internal/log_format.cc.o
+[38/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/floating_point.cpp.o
+[39/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_seed_gen_exception.dir/Release/seed_gen_exception.cc.o
+[40/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_internal_randen.dir/Release/internal/randen.cc.o
+[41/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_internal_seed_material.dir/Release/internal/seed_material.cc.o
+[42/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_log_sink_set.dir/Release/internal/log_sink_set.cc.o
+[43/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/system.cpp.o
+[44/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/memory.cpp.o
+[45/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/codegen_context.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen_context.cpp:13:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:18:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/export_resolver.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen_context.cpp:13:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/codegen_context.cpp:13:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:20:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+4 warnings generated.
+[46/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/context.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/builders/context.cpp:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/export_resolver.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/builders/context.cpp:15:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/codegen/builders/context.cpp:15:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:20:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+4 warnings generated.
+[47/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_nullguard.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[48/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_strerror.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[49/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_proto.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[50/650] Building CXX object src/rexglue/CMakeFiles/rexglue.dir/Release/main.cpp.o
+[51/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_strerror.dylib'
+[52/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_proto.dylib'
+[53/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_examine_stack.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[54/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_log_sink_set.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[55/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_format.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[56/650] Building CXX object src/codegen/CMakeFiles/rexcodegen.dir/Release/builders/vector.cpp.o
+[57/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_examine_stack.dylib'
+[58/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_log_sink_set.dylib'
+[59/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_format.dylib'
+[60/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_nullguard.dylib'
+[61/650] Linking CXX static library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/librexcodegen.a"
+[62/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_conditions.dir/Release/internal/conditions.cc.o
+[63/650] Building CXX object src/rexglue/CMakeFiles/rexglue.dir/Release/commands/codegen_command.cpp.o
+[64/650] Building CXX object src/rexglue/CMakeFiles/rexglue.dir/Release/commands/init_command.cpp.o
+[65/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_internal_pool_urbg.dir/Release/internal/pool_urbg.cc.o
+[66/650] Building CXX object thirdparty/glslang/glslang/CMakeFiles/glslang-default-resource-limits.dir/Release/ResourceLimits/ResourceLimits.cpp.o
+[67/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_message.dir/Release/internal/log_message.cc.o
+[68/650] Building CXX object thirdparty/glslang/glslang/CMakeFiles/glslang-default-resource-limits.dir/Release/ResourceLimits/resource_limits_c.cpp.o
+[69/650] Building CXX object thirdparty/abseil-cpp/absl/base/CMakeFiles/poison.dir/Release/internal/poison.cc.o
+[70/650] Building CXX object thirdparty/abseil-cpp/absl/status/CMakeFiles/status.dir/Release/status_payload_printer.cc.o
+[71/650] Building CXX object thirdparty/abseil-cpp/absl/debugging/CMakeFiles/leak_check.dir/Release/leak_check.cc.o
+[72/650] Building CXX object thirdparty/glslang/glslang/CMakeFiles/glslang.dir/Release/CInterface/glslang_c_interface.cpp.o
+[73/650] Building CXX object thirdparty/abseil-cpp/absl/status/CMakeFiles/status.dir/Release/status.cc.o
+[74/650] Building CXX object thirdparty/abseil-cpp/absl/status/CMakeFiles/status.dir/Release/internal/status_internal.cc.o
+[75/650] Building CXX object thirdparty/abseil-cpp/absl/base/CMakeFiles/scoped_set_env.dir/Release/internal/scoped_set_env.cc.o
+[76/650] Building CXX object thirdparty/abseil-cpp/absl/debugging/CMakeFiles/failure_signal_handler.dir/Release/failure_signal_handler.cc.o
+[77/650] Building CXX object thirdparty/abseil-cpp/absl/profiling/CMakeFiles/periodic_sampler.dir/Release/internal/periodic_sampler.cc.o
+[78/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/die_if_null.dir/Release/die_if_null.cc.o
+[79/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_internal_check_op.dir/Release/internal/check_op.cc.o
+[80/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_initialize.dir/Release/initialize.cc.o
+[81/650] Building CXX object thirdparty/abseil-cpp/absl/log/CMakeFiles/log_flags.dir/Release/flags.cc.o
+[82/650] Building CXX object src/rexglue/CMakeFiles/rexglue.dir/Release/commands/test_recompiler.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/rexglue/commands/test_recompiler.cpp:16:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/test_module.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:24:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:82:12: warning: unused variable 'read' [-Wunused-variable]
+   82 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory/ring_buffer.h:93:12: warning: unused variable 'read' [-Wunused-variable]
+   93 |     size_t read = Read(reinterpret_cast<uint8_t*>(&imm), sizeof(T));
+      |            ^~~~
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/rexglue/commands/test_recompiler.cpp:16:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/codegen/test_module.h:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/module.h:26:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/memory.h:27:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/src/rexglue/commands/test_recompiler.cpp:18:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime.h:19:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/src/rexglue/commands/test_recompiler.cpp:280:46: warning: unused function 'parse_disassembly' [-Wunused-function]
+  280 | std::unordered_map<std::string, std::string> parse_disassembly(
+      |                                              ^~~~~~~~~~~~~~~~~
+5 warnings generated.
+[83/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_distributions.dir/Release/discrete_distribution.cc.o
+[84/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_distributions.dir/Release/gaussian_distribution.cc.o
+[85/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_seed_sequences.dir/Release/seed_sequences.cc.o
+[86/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_internal_distribution_test_util.dir/Release/internal/chi_square.cc.o
+[87/650] Building CXX object thirdparty/abseil-cpp/absl/types/CMakeFiles/bad_any_cast_impl.dir/Release/bad_any_cast.cc.o
+[88/650] Building C object thirdparty/CMakeFiles/tiny-aes.dir/Release/tiny-aes-c/aes.c.o
+[89/650] Building CXX object thirdparty/abseil-cpp/absl/random/CMakeFiles/random_internal_distribution_test_util.dir/Release/internal/distribution_test_util.cc.o
+[90/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_conditions.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[91/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_scoped_set_env.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[92/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_status.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[93/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libglslang-default-resource-limits.14.0.0.dylib"
+[94/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_seed_gen_exception.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[95/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_seed_material.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[96/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_conditions.dylib'
+[97/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_status.dylib'
+[98/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_seed_gen_exception.dylib'
+[99/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_seed_material.dylib'
+[100/650] Building CXX object thirdparty/abseil-cpp/absl/strings/CMakeFiles/cordz_sample_token.dir/Release/internal/cordz_sample_token.cc.o
+[101/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_message.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[102/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_randen.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[103/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_message.dylib'
+[104/650] Creating library symlink '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_randen.dylib'
+[105/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_periodic_sampler.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[106/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libglslang.14.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: ignoring duplicate libraries: '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libOSDependent.a'
+[107/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_poison.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[108/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_initialize.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[109/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_leak_check.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[110/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_flags.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[111/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_distributions.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[112/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_failure_signal_handler.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[113/650] Linking CXX executable "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/rexglue"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: ignoring duplicate libraries: '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/librexgraphics.a', '/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/librexkernel.a'
+[114/650] Assembling instr_add.s
+FAILED: [code=126] tests/ppc/obj/instr_add.o /Users/Ozordi/Downloads/rexglue-sdk-main copy/out/build/macos-arm64/tests/ppc/obj/instr_add.o 
+cd "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/build/macos-arm64/tests/ppc" && "/Users/Ozordi/Downloads/rexglue-sdk-main copy/tools/binutils/powerpc-none-elf-as" -a32 -be -mregnames -mpower7 -maltivec -mvsx -mvmx128 -R -o "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/build/macos-arm64/tests/ppc/obj/instr_add.o" "/Users/Ozordi/Downloads/rexglue-sdk-main copy/tests/ppc/asm/instr_add.s"
+/bin/sh: /Users/Ozordi/Downloads/rexglue-sdk-main copy/tools/binutils/powerpc-none-elf-as: Permission denied
+[115/650] Building CXX object thirdparty/abseil-cpp/absl/status/CMakeFiles/statusor.dir/Release/statusor.cc.o
+[116/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_bad_any_cast_impl.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[117/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_log_internal_check_op.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[118/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_pool_urbg.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[119/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_die_if_null.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[120/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_cordz_sample_token.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[121/650] Linking CXX shared library "/Users/Ozordi/Downloads/rexglue-sdk-main copy/out/macos-arm64/Release/libabsl_random_internal_distribution_test_util.2407.0.0.dylib"
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+ld: warning: duplicate -rpath '/opt/homebrew/opt/llvm/lib/c++' ignored
+[122/650] Building CXX object tests/unit/CMakeFiles/unit_tests.dir/Release/core/sha256_test.cpp.o
+[123/650] Building CXX object tests/unit/CMakeFiles/unit_tests.dir/Release/memory/heap_allocation_test.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/tests/unit/memory/heap_allocation_test.cpp:14:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+1 warning generated.
+[124/650] Building CXX object tests/unit/CMakeFiles/unit_tests.dir/Release/core/cvar_test.cpp.o
+[125/650] Building CXX object tests/unit/CMakeFiles/unit_tests.dir/Release/kernel/object_table_test.cpp.o
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/tests/unit/kernel/object_table_test.cpp:10:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:21:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/thread.h:61:25: warning: increment of object of volatile-qualified type 'volatile state_t_' (aka 'volatile unsigned int') is deprecated [-Wdeprecated-volatile]
+   61 |     auto signal_state = ++signal_state_;
+      |                         ^
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/tests/unit/kernel/object_table_test.cpp:10:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xobject.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/kernel/xmemory.h:22:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/context.h:25:
+In file included from /Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/types.h:29:
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:53: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                                     ^
+/Users/Ozordi/Downloads/rexglue-sdk-main copy/include/rex/runtime/guest/detail/fpscr.h:86:41: note: use constraint modifier "w"
+   86 |         __asm__ __volatile__("msr fpcr, %0" : : "r"(csr));
+      |                                         ^~
+      |                                         %w0
+2 warnings generated.
+ninja: build stopped: subcommand failed.
