@@ -12,6 +12,7 @@
 // newer components.
 
 #include "builder_context.h"
+#include <rex/platform.h>
 #include "builders.h"
 #include "codegen_flags.h"
 #include "ppc/disasm.h"
@@ -363,7 +364,12 @@ bool Recompiler::recompile(const FunctionNode& fn) {
 
     // Generate stub with weak/alias pattern
     println("// STUB: Function at 0x{:08X} has no discovered code blocks", fn.base());
-    println("__attribute__((alias(\"__imp__{}\"))) PPC_WEAK_FUNC({});", name, name);
+    #if REX_PLATFORM_MAC
+  println("PPC_EXTERN_IMPORT(__imp__{});", name);
+  println("PPC_WEAK_FUNC({}) {{ __imp__{}(ctx, base); }}", name, name);
+#else
+  println("__attribute__((alias(\"__imp__{}\"))) PPC_WEAK_FUNC({});", name, name);
+#endif
     println("PPC_FUNC_IMPL(__imp__{}) {{", name);
     println("\tPPC_FUNC_PROLOGUE();");
     println("}}\n");
@@ -482,7 +488,12 @@ bool Recompiler::recompile(const FunctionNode& fn) {
 
   // Use weak/alias pattern - allows functions to be overridden at link time
   // The weak symbol 'name' aliases to '__imp__name', so overriding 'name' takes precedence
+  #if REX_PLATFORM_MAC
+  println("PPC_EXTERN_IMPORT(__imp__{});", name);
+  println("PPC_WEAK_FUNC({}) {{ __imp__{}(ctx, base); }}", name, name);
+#else
   println("__attribute__((alias(\"__imp__{}\"))) PPC_WEAK_FUNC({});", name, name);
+#endif
   println("PPC_FUNC_IMPL(__imp__{}) {{", name);
   println("\tPPC_FUNC_PROLOGUE();");
 
