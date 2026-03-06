@@ -112,6 +112,7 @@ if(REXGLUE_USE_METAL)
         metal/command_processor.mm
         metal/dxbc_to_dxil_converter.mm
         metal/shader.mm
+        metal/metal_shader_converter.mm
     )
 endif()
 

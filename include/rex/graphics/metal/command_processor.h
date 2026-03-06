@@ -11,6 +11,7 @@
 
 #include <rex/graphics/command_processor.h>
 #include <rex/graphics/metal/dxbc_to_dxil_converter.h>
+#include <rex/graphics/metal/metal_shader_converter.h>
 #include <rex/graphics/xenos.h>
 
 // metal-cpp forward declarations
@@ -82,6 +83,7 @@ class MetalCommandProcessor : public CommandProcessor {
   std::unordered_map<uint64_t, std::unique_ptr<MetalShader>> shader_cache_;
 
   DxbcToDxilConverter dxbc_to_dxil_converter_;
+  std::unique_ptr<MetalShaderConverter> metal_shader_converter_;
   std::unique_ptr<rex::graphics::DxbcShaderTranslator> dxbc_translator_;
 
   IRCompiler* ir_compiler_ = nullptr;
