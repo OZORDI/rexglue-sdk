@@ -204,10 +204,44 @@ static PageAccess PermsToPageAccess(const char perms[5]) {
 void* AllocFixed(void* base_address, size_t length, AllocationType allocation_type,
                  PageAccess access) {
   // Emulates Windows VirtualAlloc behavior:
-  // - Reserve: create PROT_NONE mapping to hold address space
-  // - Commit on existing reservation: mprotect to enable access (EEXIST path)
-  // - New allocation: mmap with MAP_FIXED_NOREPLACE (never silently replace)
+  //   Reserve         → PROT_NONE mapping to hold address space
+  //   Commit          → mprotect on the already-mapped shm view
+  //   ReserveCommit   → mmap (new region) or mprotect (existing)
+  //
+  // macOS note: MAP_FIXED_NOREPLACE does not exist on macOS.  The shm-backed
+  // guest address space is established in Memory::MapViews (MAP_SHARED|MAP_FIXED).
+  // A subsequent kCommit must use mprotect only — a new MAP_FIXED|MAP_ANONYMOUS
+  // mmap would silently destroy the shm view and cause a bus error.
   const uint32_t prot_requested = ToPosixProtectFlags(access);
+
+#if REX_PLATFORM_MAC
+  // On macOS ARM64 the system page size is 16 KB. The guest virtual address
+  // space is established once in Memory::MapViews() as a contiguous MAP_SHARED
+  // shm view at PROT_READ|PROT_WRITE, covering the entire 4.5 GB guest space.
+  //
+  // Because every guest page is already backed and accessible via that view:
+  //  - kReserve       -> no-op (address space is already held by the shm view)
+  //  - kCommit        -> no-op (pages are already PROT_READ|PROT_WRITE)
+  //  - kReserveCommit -> no-op (same reason)
+  //
+  // We must NOT call mprotect with sub-16KB-aligned addresses (the physical
+  // heap uses 4 KB logical pages whose host addresses are only 4 KB-aligned),
+  // and we must NOT MAP_FIXED anonymous over the shm view (that destroys it
+  // and causes SIGBUS on the next access).  Simply returning the pre-mapped
+  // address is correct and sufficient for the static codegen tool path.
+  if (base_address) {
+    return base_address;
+  }
+  // base_address == nullptr: allocate fresh anonymous memory (e.g. system heap).
+  {
+    int prot = (allocation_type == AllocationType::kReserve)
+                   ? PROT_NONE
+                   : static_cast<int>(prot_requested);
+    void* result = mmap(nullptr, length, prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    return (result != MAP_FAILED) ? result : nullptr;
+  }
+#else
+  // Linux / other POSIX -------------------------------------------------------
 
   // Determine initial protection based on allocation type
   int prot_initial = 0;
@@ -222,38 +256,34 @@ void* AllocFixed(void* base_address, size_t length, AllocationType allocation_ty
       break;
   }
 
-  // Build flags - always use MAP_FIXED_NOREPLACE for fixed addresses
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
 #if defined(MAP_FIXED_NOREPLACE)
-  if (base_address) {
-    flags |= MAP_FIXED_NOREPLACE;
-  }
+  if (base_address) flags |= MAP_FIXED_NOREPLACE;
 #else
-  if (base_address) {
-    flags |= MAP_FIXED;
-  }
+  if (base_address) flags |= MAP_FIXED;
 #endif
 
   void* result = mmap(base_address, length, prot_initial, flags, -1, 0);
   if (result != MAP_FAILED) {
     return result;
   }
-#if defined(MAP_FIXED_NOREPLACE) && REX_PLATFORM_LINUX
-  // Handle EEXIST: address already has a mapping (e.g., from prior Reserve)
-  // This is the "commit on existing reservation" path
+#if defined(MAP_FIXED_NOREPLACE)
+  // EEXIST: range already mapped (e.g. from prior Reserve) — just mprotect.
   if (errno == EEXIST && base_address &&
       (allocation_type == AllocationType::kCommit ||
        allocation_type == AllocationType::kReserveCommit)) {
-    // Verify the entire range is mapped before using mprotect
-    if (IsRangeFullyMapped(base_address, length)) {
+#if REX_PLATFORM_LINUX
+    if (IsRangeFullyMapped(base_address, length))
+#endif
+    {
       if (mprotect(base_address, length, static_cast<int>(prot_requested)) == 0) {
         return base_address;
       }
     }
   }
 #endif
-
   return nullptr;
+#endif  // !REX_PLATFORM_MAC
 }
 
 bool DeallocFixed(void* base_address, size_t length, DeallocationType deallocation_type) {
